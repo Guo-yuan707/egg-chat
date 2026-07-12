@@ -587,7 +587,6 @@
       font-size: 11px;
       margin: 0 2px;
     }
-
     /* ── Streaming cursor ── */
     .cursor-blink {
       display: inline-block;
@@ -708,7 +707,7 @@
       gap: 10px;
       padding: 40px 20px;
     }
-    .empty-state .mascot-big { font-size:72px;line-height:1 }
+    .empty-state .mascot-big { width:120px;height:120px;margin:0 auto;display:block }
     .empty-state h2 { font-size:22px;color:var(--text-primary);margin-bottom:2px }
     .empty-state p { font-size:14px;max-width:380px;line-height:1.7 }
     .empty-state .quick-actions {
@@ -783,17 +782,40 @@
       .msg-row { padding:10px 14px }
       .msg-bubble { padding:12px 14px }
       .input-area { padding:8px 14px 16px }
-      .empty-state .mascot-big { font-size:52px }
+      .empty-state .mascot-big { width:100px;height:100px }
     }
   </style>
 </head>
 <body>
+  <svg style="display:none">
+    <defs>
+      <radialGradient id="eggGrad" cx="30%" cy="30%" r="70%">
+        <stop offset="0%" stop-color="#fffcf5"/>
+        <stop offset="100%" stop-color="#fde8d0"/>
+      </radialGradient>
+    </defs>
+    <symbol id="egg-icon" viewBox="0 0 50 50">
+      <ellipse cx="25" cy="25" rx="16" ry="18" fill="url(#eggGrad)"/>
+      <ellipse cx="25" cy="26" rx="14" ry="16" fill="#f5dcc0" opacity="0.4"/>
+      <line x1="25" y1="8" x2="25" y2="2" stroke="#ffd700" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="25" cy="1" r="4" fill="#fff700"/>
+      <circle cx="25" cy="1" r="6" fill="#ffd700" opacity="0.3"/>
+      <ellipse cx="12" cy="23" rx="6" ry="4" fill="#fde8d0" transform="rotate(-30 12 23)"/>
+      <ellipse cx="38" cy="23" rx="6" ry="4" fill="#fde8d0" transform="rotate(30 38 23)"/>
+      <ellipse cx="18" cy="23" rx="5" ry="6" fill="#1a1a1a"/>
+      <ellipse cx="32" cy="23" rx="5" ry="6" fill="#1a1a1a"/>
+      <circle cx="19" cy="21" r="2" fill="#fff"/>
+      <circle cx="33" cy="21" r="2" fill="#fff"/>
+      <ellipse cx="14" cy="28" rx="4" ry="2" fill="#ffc8c8" opacity="0.6"/>
+      <ellipse cx="36" cy="28" rx="4" ry="2" fill="#ffc8c8" opacity="0.6"/>
+    </symbol>
+  </svg>
 
   <!-- ======= Sidebar 🥚 ======= -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <div class="brand">
-        <span class="mascot">🥚</span>
+        <svg class="mascot" viewBox="0 0 50 50" width="28" height="28"><use href="#egg-icon"/></svg>
         <h1>Egg</h1>
         <span class="ver">v2.0</span>
       </div>
@@ -841,7 +863,7 @@
     <!-- Header -->
     <div class="chat-header">
       <button class="btn-sidebar-toggle" onclick="toggleSidebar()">☰</button>
-      <span class="mascot-sm">🥚</span>
+      <svg class="mascot-sm" viewBox="0 0 50 50" width="32" height="32"><use href="#egg-icon"/></svg>
       <span class="title">Egg 在线</span>
       <span class="title" id="headerTitle" style="font-weight:400"></span>
     </div>
@@ -852,8 +874,8 @@
     <!-- Messages -->
     <div class="messages" id="messages">
       <div class="empty-state" id="emptyState">
-        <div class="mascot-big">🥚</div>
-        <h2>嗨～我是 Egg！🥚</h2>
+        <svg class="mascot-big" viewBox="0 0 50 50" width="100" height="100"><use href="#egg-icon"/></svg>
+        <h2>嗨～我是 Egg！</h2>
         <p>一颗会思考的蛋。还没孵出来，但已经很聪明了！问什么都会尽力帮你～</p>
         <div class="quick-actions">
           <button class="quick-btn" onclick="quickAsk('计算 sin(pi/4) * 100 + sqrt(256)')">🧮 复杂计算</button>
@@ -920,7 +942,7 @@
     const messagesEl = $('#messages');
     const inputEl = $('#userInput');
     const btnSend = $('#btnSend');
-    const emptyState = $('#emptyState');
+    let emptyState = $('#emptyState');
     const convList = $('#convList');
     const toast = $('#toast');
     const errorBanner = $('#errorBanner');
@@ -977,13 +999,14 @@
           '- 思考过程要自然，不要过于机械\n' +
           '\n' +
           '能力:\n' +
-          '- 你可以使用工具：calculator（计算器）、get_current_time（查时间）、web_search（搜索）\n' +
+          '- 你可以使用工具：calculator（计算器）、get_current_time（查时间）、web_search（搜索）、get_weather（天气）\n' +
           '- 任何数学计算都必须用 calculator！不要自己心算\n' +
           '- 涉及代码时使用 Markdown 代码块标注语言类型\n' +
           '- 涉及数学公式时使用 LaTeX 语法',
       }];
       state.convName = null;
       renderMessages();
+      emptyState = $('#emptyState');
       emptyState.style.display = 'flex';
       inputEl.focus();
       refreshConvList();
@@ -998,9 +1021,9 @@
               const date = c.savedAt ? new Date(c.savedAt).toLocaleDateString('zh-CN', {
                 month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'
               }) : '';
-              const display = c.messageCount > 0
-                ? (c.messages.find(m => m.role === 'user')?.content?.slice(0, 30) || '未命名对话')
-                : '空对话';
+              const display = c.name.startsWith('chat-')
+                ? (c.preview || '未命名对话')
+                : c.name;
               const icon = ['🥚','🦊','🐱','🐶','🐼','🦄','🐸','🐙','🐝','🌸'][Math.floor(Math.random()*10)];
               return `
                 <div class="conv-item${c.name === state.convName ? ' active' : ''}" onclick="loadConv('${c.name}')">
@@ -1023,7 +1046,8 @@
         state.messages = data.messages;
         state.convName = name;
         renderMessages();
-        emptyState.style.display = 'none';
+        emptyState = $('#emptyState');
+        if (emptyState) emptyState.style.display = 'none';
         scrollBottom();
         refreshConvList();
         toastMsg('📂 已加载');
@@ -1088,10 +1112,13 @@
     async function sendMessage() {
       if (state.isStreaming) return;
       const content = inputEl.value.trim();
+      
       if (!content) return;
 
-      emptyState.style.display = 'none';
-      state.messages.push({ role: 'user', content });
+      if (emptyState) emptyState.style.display = 'none';
+      const userMessage = { role: 'user', content };
+      
+      state.messages.push(userMessage);
       inputEl.value = '';
       autoResize(inputEl);
       renderMessages();
@@ -1263,8 +1290,8 @@
       if (visible.length === 0) {
         messagesEl.innerHTML = `
           <div class="empty-state" id="emptyState">
-            <div class="mascot-big">🥚</div>
-            <h2>嗨～我是 Egg！🥚</h2>
+            <svg class="mascot-big" viewBox="0 0 50 50" width="100" height="100"><use href="#egg-icon"/></svg>
+            <h2>嗨～我是 Egg！</h2>
             <p>一颗会思考的蛋。还没孵出来，但已经很聪明了！问什么都会尽力帮你～</p>
             <div class="quick-actions">
               <button class="quick-btn" onclick="quickAsk('计算 sin(pi/4) * 100 + sqrt(256)')">🧮 复杂计算</button>
@@ -1280,6 +1307,7 @@
         calculator: { icon: '🧮', label: '计算器' },
         get_current_time: { icon: '🕐', label: '获取时间' },
         web_search: { icon: '🔍', label: '联网搜索' },
+        get_weather: { icon: '🌤️', label: '天气查询' },
       };
 
       let html = '';
@@ -1333,16 +1361,21 @@
           const isUser = msg.role === 'user';
           const isStreamingEmpty = !isUser && !msg.content && i === visible.length - 1 && state.isStreaming;
 
-          const avatarEmoji = isUser ? '👩' : '🥚';
+          const avatarSVG = isUser 
+            ? '<span style="font-size:20px">👩</span>'
+            : '<svg viewBox="0 0 50 50" width="32" height="32"><use href="#egg-icon"/></svg>';
           const avatarClass = isUser ? 'user' : 'ai';
           const rowClass = isUser ? 'user-row' : '';
-          const content = isUser
-            ? escapeHtml(msg.content)
-            : (isStreamingEmpty ? '<div class="loading-dots">蛋黄转一转...<span></span><span></span><span></span></div>' : renderMarkdown(msg.content, actualIdx));
+          
+          let content = isUser 
+            ? escapeHtml(msg.content) 
+            : (isStreamingEmpty 
+              ? '<div class="loading-dots">蛋黄转一转...<span></span><span></span><span></span></div>' 
+              : renderMarkdown(msg.content, actualIdx));
 
           html += `
             <div class="msg-row ${rowClass}">
-              <div class="msg-avatar ${avatarClass}">${avatarEmoji}</div>
+              <div class="msg-avatar ${avatarClass}">${avatarSVG}</div>
               <div class="msg-bubble ${avatarClass}">
                 <div class="msg-content" id="msg-content-${actualIdx}">${content}</div>
               </div>
@@ -1410,6 +1443,8 @@
         messagesEl.scrollTop = messagesEl.scrollHeight;
       });
     }
+
+
 
     function autoResize(el) {
       el.style.height = 'auto';

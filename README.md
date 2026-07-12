@@ -18,9 +18,9 @@
 
 ## ✨ 核心特性
 
-- 🌐 **Web 聊天界面** — ChatGPT 风格 UI，暗色主题，响应式布局，手机也能用
+- 🌐 **Web 聊天界面** — ChatGPT 风格 UI，亮色暖色调主题，响应式布局，手机也能用
 - ⚡ **SSE 流式输出** — AI 回复逐字显示，无需等待完整的响应
-- 🔄 **多平台支持** — DeepSeek / OpenAI / 智谱 AI / 通义千问，一键切换
+- 🔄 **多平台支持** — Provider 模式设计，OpenAI-compatible 接口，可扩展多平台
 - 🧠 **RAG 知识库** — 上传文档（txt/md/pdf），AI 基于文档内容回答问题
 - 🔍 **联网搜索** — 实时搜索最新信息，支持天气查询、新闻资讯等
 - 🤖 **工具调用** — 计算器、时间查询、联网搜索、天气查询
@@ -65,11 +65,8 @@ npm run chat
 | 平台 | 注册地址 | 新用户福利 |
 |------|----------|-----------|
 | DeepSeek | [platform.deepseek.com](https://platform.deepseek.com) | 送 500 万 Token |
-| OpenAI | [platform.openai.com](https://platform.openai.com) | 需充值 |
-| 智谱 AI | [open.bigmodel.cn](https://open.bigmodel.cn) | 送额度 |
-| 通义千问 | [dashscope.aliyun.com](https://dashscope.aliyun.com) | 送额度 |
 
-推荐学生使用 **DeepSeek**，注册即送额度。
+推荐使用 **DeepSeek**，注册即送额度，性价比高。
 
 ---
 
@@ -118,7 +115,7 @@ npm run chat
 编辑 `.env`：
 
 ```bash
-PROVIDER=deepseek    # deepseek | openai | zhipu | qwen
+PROVIDER=deepseek
 API_KEY=sk-xxx
 MODEL=deepseek-chat
 ```
@@ -189,7 +186,7 @@ ai-chat-cli/
                    └────────┬────────────┘
                             │ fetch + ReadableStream
                    ┌────────▼────────────┐
-                   │  DeepSeek / OpenAI   │
+                   │     DeepSeek API     │
                    │  /chat/completions   │
                    │  (SSE stream=true)   │
                    └─────────────────────┘
@@ -214,7 +211,7 @@ ai-chat-cli/
 | 技术 | 实现 |
 |------|------|
 | **SSE 流式代理** | 后端 fetch + ReadableStream → 客户端 ReadableStream + 逐行解析 |
-| **Web 聊天 UI** | 纯 HTML/CSS/JS，零构建步骤，ChatGPT 风格暗色主题 |
+| **Web 聊天 UI** | 纯 HTML/CSS/JS，零构建步骤，ChatGPT 风格亮色暖色调主题 |
 | **Markdown 渲染** | Web: marked.js + highlight.js · CLI: 自研 ANSI 渲染器（7 种语言高亮） |
 | **请求中断** | AbortController 实现安全取消（不丢对话历史） |
 | **多平台适配** | Provider 模式封装差异，OpenAI-compatible 接口统一 |

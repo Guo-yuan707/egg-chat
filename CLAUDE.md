@@ -23,14 +23,17 @@
 ai-chat-cli/
 ├── server.js              # Web 服务器 (Node 原生 http 模块，纯手写)
 │                           路由分发 → API 处理 / SSE 代理 / 静态文件
-├── chat.js                # CLI 对话程序 (readline 交互循环)
+├── chat.js                # CLI 对话程序 (readline 交互循环 + Agent)
 ├── lib/
 │   ├── config.js          # 配置管理 + 多平台 Provider 定义
-│   ├── tools.js           # Agent 工具系统（计算器/时间/搜索 + Function Calling）
+│   ├── tools.js           # Agent 工具系统（计算器/时间/搜索/天气 + Function Calling）
 │   ├── ui.js              # CLI UI 工具：Markdown→ANSI 渲染、颜色、帮助
-│   └── storage.js         # 对话持久化 CRUD (~/.ai-chat-cli/conversations/)
+│   ├── storage.js         # 对话持久化 CRUD (~/.ai-chat-cli/conversations/)
+│   └── rag.js             # RAG 知识库 — 文档上传/分块/向量化/语义搜索
 ├── public/
 │   └── index.html         # Web SPA 聊天界面（纯 HTML/CSS/JS）
+├── data/
+│   └── knowledge/         # RAG 向量存储（vectors.json + documents.json）
 ├── .env.example           # 配置模板
 ├── package.json
 └── README.md
@@ -84,10 +87,17 @@ Browser/CLI --[HTTP POST]--> server.js --[fetch+SSE stream]--> DeepSeek API
 - `KEYWORD_PATTERNS` — 各语言关键词正则
 
 ### `lib/tools.js` — Agent 工具系统
-- `TOOLS` — OpenAI-compatible 工具定义数组（calculator / get_current_time / web_search）
+- `TOOLS` — OpenAI-compatible 工具定义数组（calculator / get_current_time / web_search / get_weather）
 - `executeTool(name, args)` — 工具执行入口
 - `safeMathEval()` — 安全数学表达式求值（防注入）
-- `searchWeb()` — DuckDuckGo 免费搜索 API
+- `searchWeb()` — Bing → DuckDuckGo 多引擎搜索
+
+### `lib/rag.js` — RAG 知识库
+- `addDocument()` — 上传文档 → 分块 → 本地向量化 → 存储
+- `searchKnowledge()` — 语义搜索，余弦相似度匹配 top-K
+- `simpleEmbed()` — 自研 100 维本地向量化（无需外部 API）
+- 支持格式：TXT / MD / JSON / HTML / PDF
+- 数据存储在 `data/knowledge/vectors.json` + `documents.json`
 
 ### `lib/storage.js` — 持久化层
 - 数据目录：`~/.ai-chat-cli/conversations/`
@@ -109,7 +119,7 @@ Browser/CLI --[HTTP POST]--> server.js --[fetch+SSE stream]--> DeepSeek API
 
 ### Web 界面
 - [x] SSE 流式对话渲染
-- [x] AI Agent 工具调用（计算器/时间/搜索 + 可视化卡片）
+- [x] AI Agent 工具调用（计算器/时间/搜索/天气 + 可视化卡片）
 - [x] 对话历史侧边栏（加载/删除）
 - [x] 模型切换下拉菜单
 - [x] 代码块语法高亮 + 复制按钮
@@ -119,9 +129,11 @@ Browser/CLI --[HTTP POST]--> server.js --[fetch+SSE stream]--> DeepSeek API
 - [x] 移动端响应式
 - [x] 加载动画
 - [x] 错误提示横幅
+- [x] RAG 知识库 — 上传文档 / 语义搜索 / 对话中自动引用
 
 ### CLI 命令行
 - [x] 流式输出 + 中断恢复
+- [x] Agent 工具调用 — 计算器 / 时间 / 搜索 / 天气
 - [x] 10 个命令 (/help /clear /save /load /list /model /models /system /stats /exit)
 - [x] ANSI Markdown 渲染（7 种语言代码高亮）
 - [x] 网络重试（2 次，指数退避）
@@ -131,9 +143,10 @@ Browser/CLI --[HTTP POST]--> server.js --[fetch+SSE stream]--> DeepSeek API
 
 ### 后端
 - [x] HTTP + SSE 双协议
-- [x] RESTful API（对话 CRUD + 配置查询）
-- [x] 4 家 AI 平台适配
-- [x] Agent 循环 — AI 自动调用工具（计算/时间/搜索），多轮对话整合结果
+- [x] RESTful API（对话 CRUD + 配置查询 + 知识库管理）
+- [x] DeepSeek 平台适配（OpenAI-compatible 接口，可扩展）
+- [x] Agent 循环 — AI 自动调用工具（计算/时间/搜索/天气），多轮整合
+- [x] RAG 知识库 — 文档分块/向量化/语义检索/对话注入
 - [x] 静态文件服务 + SPA fallback
 
 ---
@@ -151,9 +164,10 @@ Browser/CLI --[HTTP POST]--> server.js --[fetch+SSE stream]--> DeepSeek API
 - [ ] **错误重连提示** — Web 端断线时提示重试
 
 ### Phase 2：AI 能力增强（中期）
-- [x] **Function Calling / Agent** — AI 自动调用工具（计算器/时间/搜索），多轮整合
-- [ ] **图片理解** — 支持粘贴/拖入图片，调用 GPT-4o / DeepSeek-VL
-- [ ] **联网搜索** — `/search` 命令调用搜索 API 增强回答
+- [x] **Function Calling / Agent** — AI 自动调用工具（计算器/时间/搜索/天气），多轮整合
+- [x] **RAG 知识库** — 上传文档到本地知识库，对话中自动语义搜索引用
+- [x] **联网搜索** — web_search 工具，Bing → DuckDuckGo 多引擎 fallback
+- [ ] **图片理解** — 支持粘贴/拖入图片，调用多模态模型识别
 - [ ] **对话摘要自动命名** — 保存时调用 AI 生成对话标题
 - [ ] **System Prompt 模板** — 预设角色模板（程序员/翻译/写作/面试官）
 - [ ] **Temperature/top_p 滑块** — Web 端可视化调节生成参数
@@ -244,12 +258,14 @@ npm run chat
 
 ## ⚠️ 已知问题 & 技术债
 
-1. **CLI 模式的流式输出** — 加载动画 `ora` 在 Windows 终端偶有残影
-2. **Web SSE 解析** — `buffer` 分割逻辑在极端情况可能截断多字节 emoji
-3. **存储并发安全** — 文件读写未加锁，多 Tab 同时保存可能冲突
-4. **无鉴权机制** — Web 服务器直接暴露，仅适合本地使用
-5. **CI/CD 未配置** — 无自动化测试/部署流程
-6. **TypeScript 迁移** — 随着项目增长，建议逐步迁移到 TS
+1. **RAG 向量化使用本地算法** — 100 维 hash 向量，语义精度不如专业 embedding 模型；但避免了外部 API 依赖和维度不一致问题
+2. **CLI 模式的流式输出** — 加载动画 `ora` 在 Windows 终端偶有残影
+3. **Web SSE 解析** — `buffer` 分割逻辑在极端情况可能截断多字节 emoji
+4. **存储并发安全** — 文件读写未加锁，多 Tab 同时保存可能冲突
+5. **无鉴权机制** — Web 服务器直接暴露，仅适合本地使用
+6. **Bing 搜索用正则解析 HTML** — Bing 改版可能导致搜索失败，但有 DuckDuckGo fallback
+7. **CI/CD 未配置** — 无自动化测试/部署流程
+8. **TypeScript 迁移** — 随着项目增长，建议逐步迁移到 TS
 
 ---
 

@@ -4,7 +4,8 @@
 //
 //  核心特性:
 //    ✓ 流式输出 — SSE 逐字显示 AI 回复
-//    ✓ 多平台 — DeepSeek / OpenAI / 智谱 / 通义千问
+//    ✓ Agent 工具调用 — 计算器 / 时间 / 搜索 / 天气
+//    ✓ 多平台 — DeepSeek OpenAI-compatible API
 //    ✓ Markdown — 代码高亮、粗体、列表、引用
 //    ✓ 持久化 — 保存 / 加载历史对话
 //    ✓ Token 统计 — 实时显示用量
@@ -18,7 +19,7 @@ import { createInterface } from 'readline';
 import chalk from 'chalk';
 import ora from 'ora';
 
-import { loadConfig, getSystemPrompt, PROVIDERS } from './lib/config.js';
+import { loadConfig, getSystemPrompt, PROVIDERS, generateConversationTitle } from './lib/config.js';
 import {
   welcome,
   success,
@@ -35,6 +36,7 @@ import {
   loadConversation,
   listConversations,
 } from './lib/storage.js';
+import { TOOLS, executeTool } from './lib/tools.js';
 
 // ============================================================
 //  全局状态
@@ -59,165 +61,231 @@ async function streamChat() {
   isStreaming = true;
   abortController = new AbortController();
 
-  // 启动加载动画
-  const spinner = ora({
-    text: chalk.dim('AI 思考中...'),
-    color: 'cyan',
-    spinner: 'dots',
-  }).start();
-
-  let fullContent = '';
+  const MAX_TOOL_ROUNDS = 5;
+  let totalContent = '';
   let usage = null;
-  let firstToken = true;
-  let retries = 0;
-  const maxRetries = 2;
 
-  // 重试循环（仅网络错误时重试）
-  while (retries <= maxRetries) {
-    try {
-      const response = await fetch(`${config.baseURL}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${config.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: config.model,
-          messages,
-          stream: true,
-          temperature: config.temperature,
-          max_tokens: config.maxTokens,
-        }),
-        signal: abortController.signal,
-      });
+  try {
+    // ─── Agent 循环 ───
+    for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+      const spinner = ora({
+        text: round === 0 ? chalk.dim('AI 思考中...') : chalk.dim('AI 基于工具结果思考中...'),
+        color: 'cyan',
+        spinner: 'dots',
+      }).start();
 
-      // API 错误（4xx/5xx）
-      if (!response.ok) {
-        spinner.stop();
-        let errorMsg = `HTTP ${response.status}`;
+      let roundContent = '';
+      let toolCalls = [];
+      let firstToken = true;
+      let retries = 0;
+      const maxRetries = 2;
+
+      // 单次 API 调用（含重试）
+      while (retries <= maxRetries) {
         try {
-          const errData = await response.json();
-          errorMsg = errData.error?.message || errData.message || errorMsg;
-        } catch {}
-        showError(`API 调用失败: ${errorMsg}`);
+          const response = await fetch(`${config.baseURL}/chat/completions`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${config.apiKey}`,
+            },
+            body: JSON.stringify({
+              model: config.model,
+              messages,
+              stream: true,
+              temperature: config.temperature,
+              max_tokens: config.maxTokens,
+              tools: TOOLS,
+              tool_choice: 'auto',
+            }),
+            signal: abortController.signal,
+          });
 
-        // 4xx 错误不重试（Key 无效、参数错误等）
-        if (response.status >= 400 && response.status < 500) {
+          if (!response.ok) {
+            spinner.stop();
+            let errorMsg = `HTTP ${response.status}`;
+            try {
+              const errData = await response.json();
+              errorMsg = errData.error?.message || errData.message || errorMsg;
+            } catch {}
+            showError(`API 调用失败: ${errorMsg}`);
+
+            if (response.status >= 400 && response.status < 500) {
+              isStreaming = false;
+              return null;
+            }
+            retries++;
+            if (retries <= maxRetries) {
+              spinner.text = chalk.dim(`重试中 (${retries}/${maxRetries})...`);
+              spinner.start();
+              await sleep(1000 * retries);
+              continue;
+            }
+            isStreaming = false;
+            return null;
+          }
+
+          // ─── 读取 SSE 流 ───
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed || !trimmed.startsWith('data:')) continue;
+
+              const data = trimmed.slice(5).trim();
+              if (data === '[DONE]') continue;
+
+              try {
+                const parsed = JSON.parse(data);
+                const delta = parsed.choices?.[0]?.delta;
+
+                // 收到第一个 token 时停止加载动画
+                if (delta?.content) {
+                  if (firstToken) {
+                    spinner.stop();
+                    firstToken = false;
+                  }
+                  roundContent += delta.content;
+                  process.stdout.write(delta.content);
+                }
+
+                // ── 工具调用：按 index 合并碎片 ──
+                if (delta?.tool_calls) {
+                  // 工具调用开始前停止 spinner
+                  if (firstToken) {
+                    spinner.stop();
+                    firstToken = false;
+                  }
+                  for (const tc of delta.tool_calls) {
+                    const idx = tc.index ?? toolCalls.length;
+                    while (toolCalls.length <= idx) {
+                      toolCalls.push({ id: '', type: 'function', function: { name: '', arguments: '' } });
+                    }
+                    if (tc.id) toolCalls[idx].id = tc.id;
+                    if (tc.function?.name) toolCalls[idx].function.name = tc.function.name;
+                    if (tc.function?.arguments) toolCalls[idx].function.arguments += tc.function.arguments;
+                  }
+                }
+
+                if (parsed.usage) usage = parsed.usage;
+              } catch {}
+            }
+          }
+
+          // 处理缓冲区中可能残留的最后一行
+          if (buffer.trim()) {
+            const trimmed = buffer.trim();
+            if (trimmed.startsWith('data:') && trimmed.slice(5).trim() !== '[DONE]') {
+              try {
+                const parsed = JSON.parse(trimmed.slice(5).trim());
+                if (parsed.usage) usage = parsed.usage;
+              } catch {}
+            }
+          }
+
+          if (firstToken) spinner.stop();
+          break; // 成功，跳出重试循环
+
+        } catch (err) {
+          spinner.stop();
+
+          // 用户主动中断（Ctrl+C）
+          if (err.name === 'AbortError') {
+            if (roundContent || totalContent) {
+              console.log('');
+              dim('  ⏸️  已中断 (部分回复已保留在对话历史中)');
+              isStreaming = false;
+              return roundContent || totalContent;
+            }
+            dim('  ⏸️  已中断');
+            isStreaming = false;
+            return null;
+          }
+
+          // 网络错误，尝试重试
+          if (retries < maxRetries) {
+            retries++;
+            spinner.text = chalk.dim(`网络错误，重试中 (${retries}/${maxRetries})...`);
+            spinner.start();
+            await sleep(1000 * retries);
+            continue;
+          }
+
+          showError(`网络请求失败: ${err.message}`);
+          isStreaming = false;
           return null;
         }
-        // 5xx 可重试
-        retries++;
-        if (retries <= maxRetries) {
-          spinner.text = chalk.dim(`重试中 (${retries}/${maxRetries})...`);
-          spinner.start();
-          await sleep(1000 * retries);
-          continue;
-        }
-        return null;
       }
 
-      // ─── 读取 SSE 流 ───
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
+      // ─── 本轮结束：判断是否有工具调用 ───
+      if (toolCalls.length > 0) {
+        // AI 要求调用工具
+        messages.push({
+          role: 'assistant',
+          content: roundContent || null,
+          tool_calls: toolCalls.filter(tc => tc.id),
+        });
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+        // 逐个执行工具
+        for (const tc of toolCalls) {
+          if (!tc.id) continue;
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        // 最后一行可能不完整，保留到下一次
-        buffer = lines.pop() || '';
+          const fnName = tc.function.name;
+          let fnArgs = {};
+          try { fnArgs = JSON.parse(tc.function.arguments || '{}'); } catch {}
 
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || !trimmed.startsWith('data:')) continue;
-
-          const data = trimmed.slice(5).trim();
-          if (data === '[DONE]') continue;
+          console.log('');
+          info(`🔧 调用工具: ${fnName}`);
+          dim(`   参数: ${JSON.stringify(fnArgs)}`);
 
           try {
-            const parsed = JSON.parse(data);
-            const delta = parsed.choices?.[0]?.delta;
-
-            // 收到第一个 token 时停止加载动画
-            if (delta?.content) {
-              if (firstToken) {
-                spinner.stop();
-                firstToken = false;
-              }
-              fullContent += delta.content;
-              process.stdout.write(delta.content);
-            }
-
-            // 最后一个 chunk 通常包含 usage 信息
-            if (parsed.usage) {
-              usage = parsed.usage;
-            }
-          } catch {
-            // 跳过解析失败的行（极少情况）
+            const result = await executeTool(fnName, fnArgs);
+            const short = result.length > 200 ? result.slice(0, 200) + '...' : result;
+            dim(`   结果: ${short}`);
+            messages.push({ role: 'tool', tool_call_id: tc.id, content: result });
+          } catch (err) {
+            showError(`工具执行失败: ${err.message}`);
+            messages.push({ role: 'tool', tool_call_id: tc.id, content: `工具执行出错: ${err.message}` });
           }
         }
+
+        console.log('');
+        continue; // 下一轮
       }
 
-      // 处理缓冲区中可能残留的最后一行
-      if (buffer.trim()) {
-        const trimmed = buffer.trim();
-        if (trimmed.startsWith('data:') && trimmed.slice(5).trim() !== '[DONE]') {
-          try {
-            const parsed = JSON.parse(trimmed.slice(5).trim());
-            if (parsed.usage) usage = parsed.usage;
-          } catch {}
-        }
+      // ─── 纯文本回复 → 对话完成 ───
+      totalContent = roundContent;
+
+      if (usage) {
+        totalUsage.prompt_tokens += usage.prompt_tokens || 0;
+        totalUsage.completion_tokens += usage.completion_tokens || 0;
+        totalUsage.total_tokens += usage.total_tokens || 0;
+        showUsage(usage);
       }
 
-      // 如果没有收到任何 token（极少情况）
-      if (firstToken) {
-        spinner.stop();
-        return null;
-      }
-
-      break; // 成功完成，跳出重试循环
-
-    } catch (err) {
-      spinner.stop();
-
-      // 用户主动中断（Ctrl+C）
-      if (err.name === 'AbortError') {
-        if (fullContent) {
-          console.log('');
-          dim('  ⏸️  已中断 (部分回复已保留在对话历史中)');
-          return fullContent;
-        }
-        dim('  ⏸️  已中断');
-        return null;
-      }
-
-      // 网络错误，尝试重试
-      if (retries < maxRetries) {
-        retries++;
-        spinner.text = chalk.dim(`网络错误，重试中 (${retries}/${maxRetries})...`);
-        spinner.start();
-        await sleep(1000 * retries);
-        continue;
-      }
-
-      showError(`网络请求失败: ${err.message}`);
-      return null;
+      console.log('');
+      isStreaming = false;
+      return totalContent || '(空回复)';
     }
-  }
 
-  // ─── 显示 Token 用量 ───
-  if (usage) {
-    totalUsage.prompt_tokens += usage.prompt_tokens || 0;
-    totalUsage.completion_tokens += usage.completion_tokens || 0;
-    totalUsage.total_tokens += usage.total_tokens || 0;
-    showUsage(usage);
-  }
+    // 达到最大轮次
+    warn('达到最大工具调用轮次，请简化问题重试');
+    isStreaming = false;
+    return totalContent || '(空回复)';
 
-  console.log(''); // 回复后空一行
-  return fullContent || '(空回复)';
+  } finally {
+    isStreaming = false;
+  }
 }
 
 // 工具：延迟
@@ -239,7 +307,9 @@ const commands = {
     desc: '退出程序（自动保存对话）',
     handler: async () => {
       if (messages.length > 1) {
-        const filename = saveConversation(null, messages);
+        let name = null;
+        try { name = await generateConversationTitle(messages, config); } catch {}
+        const filename = saveConversation(name, messages);
         info(`对话已自动保存至: ${filename}`);
       }
       console.log(chalk.dim('  👋 再见！'));
@@ -258,14 +328,21 @@ const commands = {
   },
 
   '/save': {
-    desc: '保存当前对话到本地',
+    desc: '保存当前对话到本地（自动生成标题）',
     usage: '/save [名称]',
-    handler: (args) => {
+    handler: async (args) => {
       if (messages.length <= 1) {
         warn('当前对话为空，无需保存');
         return;
       }
-      const name = args.trim() || conversationName || null;
+      let name = args.trim() || conversationName || null;
+      // 没有指定名称时，调用 AI 自动生成标题
+      if (!name) {
+        info('AI 正在生成对话标题...');
+        try {
+          name = await generateConversationTitle(messages, config);
+        } catch {}
+      }
       const filename = saveConversation(name, messages);
       conversationName = name || filename.replace('.json', '');
       success(`已保存为 "${filename}" (${messages.length} 条消息)`);
@@ -455,7 +532,6 @@ async function main() {
   // 第一次 Ctrl+C: 中断当前 AI 请求
   // 第二次 Ctrl+C: 保存并退出
   let sigintCount = 0;
-  const sigintTimer = null;
 
   process.on('SIGINT', () => {
     if (isStreaming && abortController) {
@@ -489,11 +565,13 @@ async function main() {
   // 标记 readline 是否已关闭（管道输入 EOF 时会关闭）
   let rlClosed = false;
 
-  rl.on('close', () => {
+  rl.on('close', async () => {
     rlClosed = true;
     // 非命令触发的关闭（如 EOF）→ 自动保存
     if (messages.length > 1) {
-      const filename = saveConversation(null, messages);
+      let name = null;
+      try { name = await generateConversationTitle(messages, config); } catch {}
+      const filename = saveConversation(name, messages);
       console.log(chalk.dim(`  💾 已自动保存: ${filename}`));
     }
   });

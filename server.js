@@ -8,7 +8,7 @@ import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join, extname } from 'path';
 import { fileURLToPath } from 'url';
 
-import { loadConfig, getSystemPrompt, PROVIDERS } from './lib/config.js';
+import { loadConfig, getSystemPrompt, PROVIDERS, generateConversationTitle } from './lib/config.js';
 import {
   saveConversation,
   loadConversation as loadConv,
@@ -131,7 +131,16 @@ async function handleChat(config, req, res) {
 
   // 获取用户最新的问题
   const userMessages = messages.filter(m => m.role === 'user');
-  const latestQuestion = userMessages.length > 0 ? userMessages[userMessages.length - 1].content : '';
+  let latestQuestion = '';
+  if (userMessages.length > 0) {
+    const lastMsg = userMessages[userMessages.length - 1];
+    if (Array.isArray(lastMsg.content)) {
+      const textParts = lastMsg.content.filter(p => p.type === 'text');
+      latestQuestion = textParts.map(p => p.text).join('');
+    } else {
+      latestQuestion = lastMsg.content;
+    }
+  }
 
   // RAG 检索：搜索知识库获取相关上下文
   let ragContext = '';
@@ -384,10 +393,19 @@ function handleDeleteConversation(req, res, name) {
 }
 
 // POST /api/conversations — 保存对话
-async function handleSaveConversation(req, res) {
+async function handleSaveConversation(config, req, res) {
   const body = await parseBody(req);
   if (!body?.messages) return json(res, 400, { error: '缺少 messages 字段' });
-  const filename = saveConversation(body.name || null, body.messages);
+
+  let name = body.name || null;
+  // 没有标题时，调用 AI 自动生成
+  if (!name) {
+    try {
+      name = await generateConversationTitle(body.messages, config);
+    } catch {}
+  }
+
+  const filename = saveConversation(name, body.messages);
   json(res, 200, { success: true, filename });
 }
 
@@ -420,8 +438,13 @@ async function handleKnowledgeUpload(config, req, res) {
   }
 
   const boundary = contentType.split('boundary=')[1];
+  if (!boundary) {
+    return json(res, 400, { error: '未找到 boundary' });
+  }
+
+  const boundaryMarker = '--' + boundary;
   const bodyStr = body.toString('utf-8');
-  const parts = bodyStr.split('--' + boundary);
+  const parts = bodyStr.split(boundaryMarker);
   let fileData = null;
   let fileName = '';
 
@@ -431,13 +454,26 @@ async function handleKnowledgeUpload(config, req, res) {
     const filenameMatch = part.match(/filename="(.*?)"/);
     if (nameMatch?.[1] === 'file' && filenameMatch?.[1]) {
       fileName = filenameMatch[1];
-      const contentStart = part.indexOf('\r\n\r\n') + 4;
-      let contentEnd = part.lastIndexOf('\r\n');
-      if (contentEnd < contentStart) {
-        contentEnd = part.length;
+
+      // 用字符串找头部结束位置（headers 是纯 ASCII，安全）
+      const headerEndStr = '\r\n\r\n';
+      const headerEndIdx = part.indexOf(headerEndStr);
+      if (headerEndIdx === -1) continue;
+      const partHeader = boundaryMarker + part.slice(0, headerEndIdx) + headerEndStr;
+
+      // 在原始 Buffer 中定位文件内容的起止位置（避免 UTF-8 往返损坏二进制）
+      const headerBuffer = Buffer.from(partHeader, 'utf-8');
+      const contentStart = body.indexOf(headerBuffer);
+      if (contentStart === -1) continue;
+
+      const contentOffset = contentStart + headerBuffer.length;
+      const closingMarker = Buffer.from('\r\n' + boundaryMarker, 'utf-8');
+      let contentEnd = body.indexOf(closingMarker, contentOffset);
+      if (contentEnd === -1) {
+        contentEnd = body.length;
       }
-      const fileContent = part.slice(contentStart, contentEnd);
-      fileData = Buffer.from(fileContent, 'utf-8');
+
+      fileData = body.slice(contentOffset, contentEnd);
     }
   }
 
@@ -560,7 +596,7 @@ export function startServer(port = 3000) {
         case 'deleteConversation':
           return handleDeleteConversation(req, res, route.name);
         case 'saveConversation':
-          return handleSaveConversation(req, res);
+          return handleSaveConversation(config, req, res);
         case 'knowledgeStats':
           return handleKnowledgeStats(req, res);
         case 'knowledgeDocs':
