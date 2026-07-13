@@ -1433,6 +1433,13 @@
     }
 
     function escapeHtml(s) {
+      if (typeof s !== 'string') {
+        if (Array.isArray(s)) {
+          s = s.map(p => p.text || '').join('');
+        } else {
+          s = String(s ?? '');
+        }
+      }
       const map = {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'};
       return s.replace(/[&<>"']/g, c => map[c]);
     }
