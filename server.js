@@ -45,6 +45,9 @@ const MIME = {
 function serveStatic(res, urlPath) {
   let filePath = join(PUBLIC, urlPath === '/' ? 'index.html' : urlPath);
 
+  // DEBUG
+  console.log('[DEBUG] serveStatic — PUBLIC:', PUBLIC, 'urlPath:', urlPath, 'filePath:', filePath, 'exists:', existsSync(filePath));
+
   // 防止路径穿越
   if (!filePath.startsWith(PUBLIC)) {
     res.writeHead(403);
@@ -643,11 +646,16 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 }
 
 export default async function handler(req, res) {
+  // DEBUG: 确认函数被调用
+  console.log('[DEBUG] handler invoked, url:', req.url, 'method:', req.method);
+
   let config;
   try {
     config = loadConfig();
+    console.log('[DEBUG] config loaded, provider:', config.provider);
   } catch (err) {
     // 配置错误时返回友好提示页面，而不是直接崩溃
+    console.error('[DEBUG] config error:', err.message);
     if (err.code === 'CONFIG_MISSING') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
       res.end(`<!DOCTYPE html>
@@ -723,4 +731,5 @@ export default async function handler(req, res) {
   }
 
   serveStatic(res, urlPath);
+  console.log('[DEBUG] served static:', urlPath);
 }
