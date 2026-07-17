@@ -644,10 +644,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
 export default async function handler(req, res) {
   const config = loadConfig();
-  const url = new URL(req.url, `http://localhost:3000`).pathname;
+  const urlPath = req.url.startsWith('http') ? new URL(req.url).pathname : req.url;
   const method = req.method;
 
-  const route = matchRoute(method, url);
+  const route = matchRoute(method, urlPath);
   if (route) {
     switch (route.handler) {
       case 'chat':
@@ -679,5 +679,5 @@ export default async function handler(req, res) {
     }
   }
 
-  serveStatic(res, url);
+  serveStatic(res, urlPath);
 }
