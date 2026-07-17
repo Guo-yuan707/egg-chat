@@ -643,7 +643,50 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 }
 
 export default async function handler(req, res) {
-  const config = loadConfig();
+  let config;
+  try {
+    config = loadConfig();
+  } catch (err) {
+    // 配置错误时返回友好提示页面，而不是直接崩溃
+    if (err.code === 'CONFIG_MISSING') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(`<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Egg Chat — 配置提醒</title>
+<style>
+  body { font-family: system-ui; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #fefaf0; color: #333; }
+  .card { background: #fff; border-radius: 16px; padding: 40px; max-width: 480px; text-align: center; box-shadow: 0 2px 20px rgba(0,0,0,0.08); }
+  .egg { font-size: 64px; margin-bottom: 16px; }
+  h1 { font-size: 22px; margin: 0 0 8px; }
+  .hint { color: #888; font-size: 14px; margin-top: 20px; background: #fffbe6; padding: 12px; border-radius: 8px; text-align: left; line-height: 1.6; }
+  code { background: #f0e8d8; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="egg">🥚</div>
+  <h1>蛋蛋需要配置才能孵出来！</h1>
+  <p style="color:#666;">${err.message}</p>
+  <div class="hint">
+    请在 Vercel 项目设置中添加环境变量:<br>
+    <code>API_KEY</code> — 你的 API Key<br>
+    <code>PROVIDER</code> — deepseek<br>
+    <code>BASE_URL</code> — https://api.deepseek.com/v1<br>
+    <code>MODEL</code> — deepseek-chat
+  </div>
+</div>
+</body>
+</html>`);
+      return;
+    }
+    res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+    res.end('Internal Server Error');
+    return;
+  }
+
   const urlPath = req.url.startsWith('http') ? new URL(req.url).pathname : req.url;
   const method = req.method;
 

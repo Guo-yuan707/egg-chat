@@ -7,3 +7,5 @@ Thumbs.db
 tmp/
 data/
 test_*.js
+.vercel
+.env*
