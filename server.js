@@ -406,6 +406,7 @@ async function handleSaveConversation(config, req, res) {
   }
 
   const filename = saveConversation(name, body.messages);
+  console.log(`[保存对话] ${filename}, 消息数: ${body.messages.length}`);
   json(res, 200, { success: true, filename });
 }
 
