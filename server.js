@@ -641,3 +641,43 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const port = parseInt(process.env.PORT) || 3000;
   startServer(port);
 }
+
+export default async function handler(req, res) {
+  const config = loadConfig();
+  const url = new URL(req.url, `http://localhost:3000`).pathname;
+  const method = req.method;
+
+  const route = matchRoute(method, url);
+  if (route) {
+    switch (route.handler) {
+      case 'chat':
+        return handleChat(config, req, res);
+      case 'getConfig':
+        return handleGetConfig(config, req, res);
+      case 'setModel':
+        return handleSetModel(config, req, res);
+      case 'listConversations':
+        return handleListConversations(req, res);
+      case 'loadConversation':
+        return handleLoadConversation(req, res, route.name);
+      case 'deleteConversation':
+        return handleDeleteConversation(req, res, route.name);
+      case 'saveConversation':
+        return handleSaveConversation(config, req, res);
+      case 'knowledgeStats':
+        return handleKnowledgeStats(req, res);
+      case 'knowledgeDocs':
+        return handleKnowledgeDocs(req, res);
+      case 'knowledgeUpload':
+        return handleKnowledgeUpload(config, req, res);
+      case 'knowledgeDelete':
+        return handleKnowledgeDelete(req, res, route.docId);
+      case 'knowledgeClear':
+        return handleKnowledgeClear(req, res);
+      case 'knowledgeSearch':
+        return handleKnowledgeSearch(config, req, res);
+    }
+  }
+
+  serveStatic(res, url);
+}
