@@ -149,100 +149,6 @@
     }
     .sidebar-models select:focus { border-color: var(--accent) }
 
-    .sidebar-kb {
-      padding: 8px 16px;
-      margin: 0 8px;
-      background: rgba(91,154,104,.04);
-      border: 1.5px solid rgba(91,154,104,.15);
-      border-radius: var(--radius);
-    }
-    .sidebar-kb-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-primary);
-      margin-bottom: 6px;
-    }
-    .btn-kb-clear {
-      background: none;
-      border: none;
-      font-size: 14px;
-      cursor: pointer;
-      opacity: .5;
-      transition: opacity .15s;
-      padding: 2px;
-      border-radius: 4px;
-    }
-    .btn-kb-clear:hover { opacity: 1; background: rgba(224,85,106,.1); }
-    .sidebar-kb-stats {
-      font-size: 11.5px;
-      color: var(--text-dim);
-      margin-bottom: 8px;
-    }
-    .btn-kb-upload {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      padding: 6px 12px;
-      background: var(--green-soft);
-      color: var(--green);
-      border: 1.5px solid rgba(91,154,104,.3);
-      border-radius: 8px;
-      font-size: 12.5px;
-      font-weight: 550;
-      cursor: pointer;
-      transition: all .15s;
-    }
-    .btn-kb-upload:hover {
-      background: rgba(91,154,104,.1);
-      border-color: var(--green);
-    }
-    .btn-kb-upload input[type="file"] {
-      display: none;
-    }
-    .sidebar-kb-list {
-      margin-top: 8px;
-      max-height: 120px;
-      overflow-y: auto;
-    }
-    .sidebar-kb-list::-webkit-scrollbar{width:3px}
-    .sidebar-kb-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:10px}
-    .kb-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 5px 8px;
-      margin: 2px 0;
-      border-radius: 6px;
-      font-size: 12px;
-      color: var(--text-secondary);
-      cursor: pointer;
-      transition: background .1s;
-    }
-    .kb-item:hover { background: rgba(0,0,0,.03) }
-    .kb-item-icon { font-size: 14px; }
-    .kb-item-name {
-      flex: 1;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-    .kb-item-del {
-      opacity: 0;
-      background: none;
-      border: none;
-      font-size: 12px;
-      color: var(--danger);
-      cursor: pointer;
-      padding: 2px 4px;
-      border-radius: 4px;
-      transition: all .15s;
-    }
-    .kb-item:hover .kb-item-del { opacity: 1 }
-    .kb-item-del:hover { background: var(--danger-soft) }
-
     .sidebar-convs-label {
       padding: 8px 16px 4px;
       font-size: 11px;
@@ -544,6 +450,133 @@
     }
     .input-row textarea::placeholder { color: var(--text-dim) }
 
+    .btn-upload {
+      width: 40px;height: 40px;
+      border-radius: var(--radius-md);
+      background: transparent;
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: all .2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .btn-upload:hover {
+      background: var(--bg-hover);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+    .btn-upload svg { width: 18px;height: 18px; }
+    .upload-badge {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: white;
+      font-size: 10px;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+    .upload-badge.show { display: flex; }
+    .upload-icon { font-size: 18px; }
+
+    .upload-progress-area {
+      margin-top: 8px;
+      padding: 8px 16px;
+      background: var(--bg-input);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border);
+    }
+    .upload-progress-info {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+    .upload-progress-icon { font-size: 14px; }
+    .upload-progress-bar-container {
+      width: 100%;
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .upload-progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), #ffd369);
+      border-radius: 3px;
+      transition: width .2s ease;
+      width: 0%;
+    }
+
+    .file-card {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      margin-top: 4px;
+      max-width: 100%;
+    }
+    .file-icon {
+      font-size: 20px;
+    }
+    .file-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .file-name {
+      font-size: 13px;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .file-size {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+    .file-progress {
+      width: 100%;
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      margin-top: 4px;
+      overflow: hidden;
+    }
+    .file-progress-bar {
+      height: 100%;
+      background: var(--accent);
+      border-radius: 2px;
+      transition: width .3s ease;
+    }
+    .file-remove {
+      width: 24px;
+      height: 24px;
+      border: none;
+      background: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+    .file-remove:hover {
+      background: var(--bg-hover);
+      color: #ff4757;
+    }
     .btn-send {
       width: 42px;height: 42px;
       border-radius: 50%;
@@ -782,7 +815,7 @@
       .msg-row { padding:10px 14px }
       .msg-bubble { padding:12px 14px }
       .input-area { padding:8px 14px 16px }
-      .empty-state .mascot-big { width:120px;height:120px }
+      .empty-state .mascot-big { width:100px;height:100px }
     }
   </style>
 </head>
@@ -795,7 +828,19 @@
       </radialGradient>
     </defs>
     <symbol id="egg-icon" viewBox="0 0 50 50">
-      <image href="assets/egg-new.png" x="-5" y="-5" width="60" height="60" preserveAspectRatio="xMidYMid meet"/>
+      <ellipse cx="25" cy="25" rx="16" ry="18" fill="url(#eggGrad)"/>
+      <ellipse cx="25" cy="26" rx="14" ry="16" fill="#f5dcc0" opacity="0.4"/>
+      <line x1="25" y1="8" x2="25" y2="2" stroke="#ffd700" stroke-width="3" stroke-linecap="round"/>
+      <circle cx="25" cy="1" r="4" fill="#fff700"/>
+      <circle cx="25" cy="1" r="6" fill="#ffd700" opacity="0.3"/>
+      <ellipse cx="12" cy="23" rx="6" ry="4" fill="#fde8d0" transform="rotate(-30 12 23)"/>
+      <ellipse cx="38" cy="23" rx="6" ry="4" fill="#fde8d0" transform="rotate(30 38 23)"/>
+      <ellipse cx="18" cy="23" rx="5" ry="6" fill="#1a1a1a"/>
+      <ellipse cx="32" cy="23" rx="5" ry="6" fill="#1a1a1a"/>
+      <circle cx="19" cy="21" r="2" fill="#fff"/>
+      <circle cx="33" cy="21" r="2" fill="#fff"/>
+      <ellipse cx="14" cy="28" rx="4" ry="2" fill="#ffc8c8" opacity="0.6"/>
+      <ellipse cx="36" cy="28" rx="4" ry="2" fill="#ffc8c8" opacity="0.6"/>
     </symbol>
   </svg>
 
@@ -817,23 +862,6 @@
       <select id="modelSelect" onchange="changeModel(this.value)">
         <option value="">加载中...</option>
       </select>
-    </div>
-
-    <div class="sidebar-kb">
-      <div class="sidebar-kb-header">
-        <span>📚 知识库</span>
-        <button class="btn-kb-clear" onclick="clearKnowledge()" title="清空知识库">🗑️</button>
-      </div>
-      <div class="sidebar-kb-stats" id="kbStats">暂无文档</div>
-      <div class="sidebar-kb-upload">
-        <label class="btn-kb-upload">
-          <input type="file" accept=".pdf,.txt,.md,.html" onchange="uploadKnowledgeFile(this)" />
-          📤 上传文档
-        </label>
-      </div>
-      <div class="sidebar-kb-list" id="kbList">
-        <!-- 文档列表 -->
-      </div>
     </div>
 
     <div class="sidebar-convs-label">💬 历史对话</div>
@@ -862,7 +890,7 @@
     <!-- Messages -->
     <div class="messages" id="messages">
       <div class="empty-state" id="emptyState">
-        <svg class="mascot-big" viewBox="0 0 50 50" width="120" height="120"><use href="#egg-icon"/></svg>
+        <svg class="mascot-big" viewBox="0 0 50 50" width="100" height="100"><use href="#egg-icon"/></svg>
         <h2>嗨～我是 Egg！</h2>
         <p>一颗会思考的蛋。还没孵出来，但已经很聪明了！问什么都会尽力帮你～</p>
         <div class="quick-actions">
@@ -877,6 +905,11 @@
     <!-- Input -->
     <div class="input-area">
       <div class="input-row">
+        <button class="btn-upload" id="btnUpload" title="上传文档">
+          <span class="upload-icon">📎</span>
+          <span class="upload-badge" id="uploadBadge"></span>
+        </button>
+        <input type="file" id="fileInput" accept=".pdf,.docx,.xlsx,.pptx,.txt,.md,.html,.csv" style="display:none" onchange="handleFileUpload(this)">
         <textarea
           id="userInput"
           placeholder="输入你的问题... ✍️"
@@ -888,8 +921,17 @@
           <svg viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
         </button>
       </div>
+      <div class="upload-progress-area" id="uploadProgressArea" style="display:none">
+        <div class="upload-progress-info">
+          <span class="upload-progress-icon">📤</span>
+          <span class="upload-progress-text" id="uploadProgressText">正在上传...</span>
+        </div>
+        <div class="upload-progress-bar-container">
+          <div class="upload-progress-bar" id="uploadProgressBar"></div>
+        </div>
+      </div>
       <div class="input-hint" id="inputHint">
-        按 <kbd>Enter</kbd> 发送 · <kbd>Shift+Enter</kbd> 换行 · <kbd>Ctrl+S</kbd> 保存
+        按 <kbd>Enter</kbd> 发送 · <kbd>Shift+Enter</kbd> 换行 · <kbd>Ctrl+S</kbd> 保存 · 📎 上传文档
       </div>
     </div>
   </div>
@@ -908,6 +950,7 @@
       isStreaming: false,
       abortController: null,
       config: null,
+      attachedFile: null,
     };
 
     // ── Marked + Highlight setup ──
@@ -1050,24 +1093,13 @@
     }
 
     async function saveConvSilent() {
-      if (state.messages.length <= 1) return;
       try {
-        const res = await fetch('/api/conversations', {
+        await fetch('/api/conversations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: state.convName, messages: state.messages }),
         });
-        const data = await res.json();
-        if (data.filename) {
-          state.convName = data.filename.replace('.json', '');
-          console.log('Saved conversation:', state.convName);
-          refreshConvList();
-        } else {
-          console.log('Save failed, no filename returned:', data);
-        }
-      } catch (e) {
-        console.error('Save error:', e);
-      }
+      } catch {}
     }
 
     async function saveConv() {
@@ -1107,24 +1139,177 @@
       toastMsg('🧠 已切换至 ' + model);
     }
 
+    // ── 文件上传处理 ──
+    function formatFileSize(bytes) {
+      if (bytes < 1024) return bytes + ' B';
+      if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+      return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+    }
+
+    function getFileIcon(filename) {
+      const ext = filename.toLowerCase().split('.').pop();
+      const icons = {
+        pdf: '📕', txt: '📄', md: '📝', html: '🌐',
+        doc: '📘', docx: '📘', xlsx: '📗', pptx: '📙',
+        jpg: '🖼️', jpeg: '🖼️', png: '🖼️', gif: '🖼️',
+      };
+      return icons[ext] || '📎';
+    }
+
+    function renderAttachedFile() {
+      const badge = document.getElementById('uploadBadge');
+      if (state.attachedFile) {
+        badge.textContent = '✓';
+        badge.classList.add('show');
+      } else {
+        badge.classList.remove('show');
+      }
+    }
+
+    async function handleFileUpload(input) {
+      const file = input.files[0];
+      if (!file) return;
+
+      if (file.size > 10 * 1024 * 1024) {
+        toastMsg('文件大小不能超过 10MB');
+        return;
+      }
+
+      state.attachedFile = {
+        file: file,
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        fileId: null,
+        uploaded: false,
+        uploading: true,
+        progress: 0
+      };
+
+      renderAttachedFile();
+      showUploadProgress(true);
+      updateUploadProgress(0, file.name);
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/files/upload');
+
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const percent = Math.round((e.loaded / e.total) * 100);
+            state.attachedFile.progress = percent;
+            updateUploadProgress(percent, file.name);
+          }
+        };
+
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const result = JSON.parse(xhr.responseText);
+            if (result.success) {
+              state.attachedFile.fileId = result.fileId;
+              state.attachedFile.uploaded = true;
+              state.attachedFile.uploading = false;
+              updateUploadProgress(100, file.name, '上传完成');
+              toastMsg(`📎 ${file.name} 上传成功`);
+            } else {
+              toastMsg('文件上传失败: ' + result.error);
+              removeAttachedFile();
+            }
+          } else {
+            toastMsg('文件上传失败');
+            removeAttachedFile();
+          }
+        };
+
+        xhr.onerror = () => {
+          toastMsg('文件上传失败');
+          removeAttachedFile();
+        };
+
+        xhr.send(formData);
+      } catch (e) {
+        toastMsg('文件上传失败: ' + e.message);
+        removeAttachedFile();
+      }
+
+      input.value = '';
+    }
+
+    function removeAttachedFile() {
+      if (state.attachedFile?.fileId) {
+        fetch('/api/files/' + state.attachedFile.fileId, { method: 'DELETE' }).catch(() => {});
+      }
+      state.attachedFile = null;
+      renderAttachedFile();
+      showUploadProgress(false);
+    }
+
+    function showUploadProgress(show) {
+      document.getElementById('uploadProgressArea').style.display = show ? 'block' : 'none';
+    }
+
+    function getFileIcon(fileName) {
+      const ext = fileName.split('.').pop().toLowerCase();
+      const icons = {
+        pdf: '📄',
+        doc: '📝', docx: '📝',
+        xls: '📊', xlsx: '📊', csv: '📊',
+        ppt: '🎯', pptx: '🎯',
+        txt: '📋', md: '📝', json: '⚙️',
+        html: '🌐', htm: '🌐',
+      };
+      return icons[ext] || '📎';
+    }
+
+    function updateUploadProgress(percent, fileName, statusText) {
+      const bar = document.getElementById('uploadProgressBar');
+      const text = document.getElementById('uploadProgressText');
+      const icon = document.querySelector('.upload-progress-icon');
+      const fileIcon = getFileIcon(fileName);
+      if (icon) icon.textContent = fileIcon;
+      bar.style.width = percent + '%';
+      if (statusText) {
+        text.textContent = statusText;
+      } else {
+        text.textContent = `正在上传 ${fileName}... ${percent}%`;
+      }
+    }
+
+    document.getElementById('btnUpload').addEventListener('click', () => {
+      document.getElementById('fileInput').click();
+    });
+
     // ── 发送消息 ──
     async function sendMessage() {
       if (state.isStreaming) return;
       const content = inputEl.value.trim();
       
-      if (!content) return;
+      if (!content && !state.attachedFile) return;
 
       if (emptyState) emptyState.style.display = 'none';
-      const userMessage = { role: 'user', content };
+      
+      const userMessage = { 
+        role: 'user', 
+        content: content,
+        file: state.attachedFile ? {
+          name: state.attachedFile.name,
+          size: state.attachedFile.size,
+          type: state.attachedFile.type
+        } : null
+      };
       
       state.messages.push(userMessage);
       inputEl.value = '';
       autoResize(inputEl);
       renderMessages();
-      scrollBottom(true);
+      scrollBottom();
 
       state.isStreaming = true;
       btnSend.disabled = true;
+      state.abortController = new AbortController();
 
       let aiMsgIndex = -1;
       let fullContent = '';
@@ -1134,14 +1319,26 @@
       state.messages.push({ role: 'assistant', content: '' });
       aiMsgIndex = state.messages.length - 1;
       renderMessages();
-      scrollBottom(true);
+      scrollBottom();
 
       try {
         const apiMessages = state.messages.filter(m => ['system', 'user', 'assistant'].includes(m.role));
+        
+        if (state.attachedFile && state.attachedFile.uploading) {
+          toastMsg('请等待文件上传完成后再发送');
+          return;
+        }
+        
+        const bodyData = { messages: apiMessages };
+        if (state.attachedFile?.fileId) {
+          bodyData.fileId = state.attachedFile.fileId;
+        }
+        
         const response = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: apiMessages }),
+          body: JSON.stringify(bodyData),
+          signal: state.abortController.signal,
         });
 
         if (!response.ok) {
@@ -1170,6 +1367,7 @@
               if (parsed.error) throw new Error(parsed.error);
 
               // ── 工具调用事件 ──
+              // 插入到 assistant 气泡之前
               if (parsed.type === 'tool_call') {
                 const toolMsg = {
                   role: 'tool_call',
@@ -1184,9 +1382,10 @@
                   state.messages.push(toolMsg);
                 }
                 renderMessages();
+                scrollBottom();
               }
 
-              // ── 工具返回 ──
+              // ── 工具返回：准备接收下一轮的真实回答 ──
               if (parsed.type === 'tool_result') {
                 const tc = state.messages.find(
                   m => m.role === 'tool_call' && m.name === parsed.name && m.result === null
@@ -1207,19 +1406,22 @@
                     state.messages.push(resultMsg);
                   }
                 }
+
+                // ★ 关键：工具返回后，Agent 进入下一轮，重置 fullContent
+                //   避免将上一轮"思考过程"拼接到最终答案里
                 fullContent = '';
                 if (aiMsgIndex >= 0) {
                   state.messages[aiMsgIndex].content = '';
                 }
+
                 renderMessages();
+                scrollBottom();
               }
 
-              // ── 文本内容到达 ──
+              // ── 文本内容到达 → 追加到 assistant 气泡 ──
               if (parsed.content) {
                 fullContent += parsed.content;
-                if (aiMsgIndex >= 0) {
-                  state.messages[aiMsgIndex].content = fullContent;
-                }
+                state.messages[aiMsgIndex].content = fullContent;
               }
 
               // ── 完成 ──
@@ -1233,20 +1435,11 @@
             }
           }
 
-          // 更新 assistant 气泡内容
           if (aiMsgIndex >= 0) {
             const bubble = document.getElementById('msg-content-' + aiMsgIndex);
             if (bubble) {
               if (fullContent) {
-                try {
-                  let html = marked.parse(fullContent);
-                  html = html.replace(/<a /g, '<a target="_blank" rel="noopener" ');
-                  html = html.replace(/<img /g, '<img style="max-width:100%;border-radius:8px" ');
-                  bubble.innerHTML = html + '<span class="cursor-blink"></span>';
-                } catch {
-                  const rawText = escapeHtml(fullContent).replace(/\n/g, '<br>');
-                  bubble.innerHTML = rawText + '<span class="cursor-blink"></span>';
-                }
+                bubble.innerHTML = renderMarkdown(fullContent, aiMsgIndex) + '<span class="cursor-blink"></span>';
               } else {
                 bubble.innerHTML = '<div class="loading-dots">蛋黄转一转...<span></span><span></span><span></span></div>';
               }
@@ -1264,16 +1457,25 @@
         }
 
       } catch (err) {
-        state.messages.push({ role: 'assistant', content: `😢 出错了: ${err.message}` });
+        if (err.name === 'AbortError') {
+          if (aiMsgIndex >= 0) {
+            state.messages[aiMsgIndex].content += ' *(已中断 ⏸️)*';
+          }
+        } else {
+          state.messages.push({ role: 'assistant', content: `😢 出错了: ${err.message}` });
+        }
       }
 
       renderMessages();
       scrollBottom();
       state.isStreaming = false;
       btnSend.disabled = false;
+      state.abortController = null;
+      state.attachedFile = null;
+      document.getElementById('uploadProgressArea').style.display = 'none';
+      renderAttachedFile();
       inputEl.focus();
-      console.log('Messages length:', state.messages.length, 'convName:', state.convName);
-      if (state.messages.length > 1) saveConvSilent();
+      if (state.convName) saveConvSilent();
     }
 
     // ── 渲染 ──
@@ -1282,7 +1484,7 @@
       if (visible.length === 0) {
         messagesEl.innerHTML = `
           <div class="empty-state" id="emptyState">
-            <svg class="mascot-big" viewBox="0 0 50 50" width="120" height="120"><use href="#egg-icon"/></svg>
+            <svg class="mascot-big" viewBox="0 0 50 50" width="100" height="100"><use href="#egg-icon"/></svg>
             <h2>嗨～我是 Egg！</h2>
             <p>一颗会思考的蛋。还没孵出来，但已经很聪明了！问什么都会尽力帮你～</p>
             <div class="quick-actions">
@@ -1356,15 +1558,35 @@
           const avatarSVG = isUser 
             ? '<span style="font-size:20px">👩</span>'
             : '<svg viewBox="0 0 50 50" width="32" height="32"><use href="#egg-icon"/></svg>';
-
           const avatarClass = isUser ? 'user' : 'ai';
           const rowClass = isUser ? 'user-row' : '';
           
-          let content = isUser 
-            ? escapeHtml(msg.content) 
-            : (isStreamingEmpty 
+          let content = '';
+          
+          if (isUser) {
+            if (msg.content) {
+              content = escapeHtml(msg.content);
+            }
+            if (msg.file) {
+              const fileIcon = getFileIcon(msg.file.name);
+              const fileSize = formatFileSize(msg.file.size);
+              content += `
+                <div class="file-card">
+                  <div class="file-icon">${fileIcon}</div>
+                  <div class="file-info">
+                    <div class="file-name">${escapeHtml(msg.file.name)}</div>
+                    <div class="file-size">${fileSize}</div>
+                    <div class="file-progress">
+                      <div class="file-progress-bar" style="width: 100%"></div>
+                    </div>
+                  </div>
+                </div>`;
+            }
+          } else {
+            content = isStreamingEmpty 
               ? '<div class="loading-dots">蛋黄转一转...<span></span><span></span><span></span></div>' 
-              : renderMarkdown(msg.content, actualIdx));
+              : renderMarkdown(msg.content, actualIdx);
+          }
 
           html += `
             <div class="msg-row ${rowClass}">
@@ -1438,19 +1660,14 @@
     }
 
     // ── 工具 ──
-    function scrollBottom(force = false) {
-      if (force) {
-        requestAnimationFrame(() => {
+    function scrollBottom() {
+      requestAnimationFrame(() => {
+        const threshold = 50;
+        const isNearBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < threshold;
+        if (isNearBottom) {
           messagesEl.scrollTop = messagesEl.scrollHeight;
-        });
-        return;
-      }
-      const isNearBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 50;
-      if (isNearBottom) {
-        requestAnimationFrame(() => {
-          messagesEl.scrollTop = messagesEl.scrollHeight;
-        });
-      }
+        }
+      });
     }
 
 
@@ -1495,106 +1712,7 @@
       }
     });
 
-    // ── 知识库功能 ──
-    async function loadKnowledgeStats() {
-      try {
-        const res = await fetch('/api/knowledge/stats');
-        const stats = await res.json();
-        const statsEl = document.getElementById('kbStats');
-        if (stats.documentCount === 0) {
-          statsEl.textContent = '暂无文档';
-        } else {
-          statsEl.textContent = `${stats.documentCount} 个文档 · ${stats.vectorCount} 个片段`;
-        }
-      } catch {}
-    }
 
-    async function loadKnowledgeDocs() {
-      try {
-        const res = await fetch('/api/knowledge/docs');
-        const docs = await res.json();
-        const listEl = document.getElementById('kbList');
-        if (docs.length === 0) {
-          listEl.innerHTML = '<div style="padding:8px 0;color:var(--text-dim);font-size:12px;text-align:center">上传文档来建立知识库</div>';
-          return;
-        }
-        listEl.innerHTML = docs.map(doc => {
-          const ext = doc.fileName.split('.').pop().toLowerCase();
-          const icon = ext === 'pdf' ? '📄' : ext === 'md' ? '📝' : ext === 'txt' ? '📋' : '📁';
-          const date = new Date(doc.addedAt).toLocaleDateString('zh-CN', { month:'2-digit', day:'2-digit' });
-          return `
-            <div class="kb-item">
-              <span class="kb-item-icon">${icon}</span>
-              <span class="kb-item-name" title="${escapeHtml(doc.fileName)}">${escapeHtml(doc.fileName)}</span>
-              <span style="font-size:10px;color:var(--text-dim)">${date}</span>
-              <button class="kb-item-del" onclick="deleteKnowledgeDoc('${doc.id}')" title="删除">×</button>
-            </div>`;
-        }).join('');
-      } catch {}
-    }
-
-    async function uploadKnowledgeFile(input) {
-      const file = input.files[0];
-      if (!file) return;
-
-      const btn = input.parentElement;
-      const originalText = btn.textContent;
-      btn.textContent = '⏳ 上传中...';
-      btn.disabled = true;
-
-      try {
-        const formData = new FormData();
-        formData.append('file', file);
-        const res = await fetch('/api/knowledge/upload', {
-          method: 'POST',
-          body: formData,
-        });
-        const data = await res.json();
-        if (data.success) {
-          toastMsg(`📚 已添加: ${data.chunkCount} 个片段`);
-        } else {
-          toastMsg(`😢 ${data.error}`);
-        }
-      } catch (err) {
-        toastMsg(`😢 上传失败: ${err.message}`);
-      } finally {
-        btn.textContent = originalText;
-        btn.disabled = false;
-        input.value = '';
-        loadKnowledgeStats();
-        loadKnowledgeDocs();
-      }
-    }
-
-    async function deleteKnowledgeDoc(docId) {
-      if (!confirm('确定要删除这个文档吗？')) return;
-      try {
-        await fetch(`/api/knowledge/docs/${docId}`, { method: 'DELETE' });
-        toastMsg('🗑️ 已删除');
-        loadKnowledgeStats();
-        loadKnowledgeDocs();
-      } catch {
-        toastMsg('😢 删除失败');
-      }
-    }
-
-    async function clearKnowledge() {
-      if (!confirm('确定要清空整个知识库吗？此操作不可恢复！')) return;
-      try {
-        await fetch('/api/knowledge/clear', { method: 'DELETE' });
-        toastMsg('🗑️ 知识库已清空');
-        loadKnowledgeStats();
-        loadKnowledgeDocs();
-      } catch {
-        toastMsg('😢 清空失败');
-      }
-    }
-
-    // 页面加载时初始化知识库
-    document.addEventListener('DOMContentLoaded', () => {
-      loadKnowledgeStats();
-      loadKnowledgeDocs();
-    });
   </script>
 </body>
 </html>

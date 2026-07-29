@@ -4,9 +4,10 @@
 // ============================================================
 
 import { createServer } from 'http';
-import { readFileSync, existsSync, mkdirSync, writeFileSync } from 'fs';
+import { readFileSync, existsSync, mkdirSync, writeFileSync, unlinkSync } from 'fs';
 import { join, extname } from 'path';
 import { fileURLToPath } from 'url';
+import { tmpdir } from 'os';
 
 import { loadConfig, getSystemPrompt, PROVIDERS, generateConversationTitle } from './lib/config.js';
 import {
@@ -28,6 +29,23 @@ import {
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const PUBLIC = join(__dirname, 'public');
 
+// 获取安全的临时目录（云环境兼容）
+function getTempDir() {
+  const projectTmp = join(__dirname, 'tmp');
+  try {
+    if (!existsSync(projectTmp)) mkdirSync(projectTmp, { recursive: true });
+    const testFile = join(projectTmp, '.write-test');
+    writeFileSync(testFile, 'ok');
+    unlinkSync(testFile);
+    return projectTmp;
+  } catch {
+    const sysTmp = join(tmpdir(), 'egg-chat-tmp');
+    mkdirSync(sysTmp, { recursive: true });
+    return sysTmp;
+  }
+}
+const TMP_DIR = getTempDir();
+
 // MIME 类型映射
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -44,9 +62,6 @@ const MIME = {
 // ============================================================
 function serveStatic(res, urlPath) {
   let filePath = join(PUBLIC, urlPath === '/' ? 'index.html' : urlPath);
-
-  // DEBUG
-  console.log('[DEBUG] serveStatic — PUBLIC:', PUBLIC, 'urlPath:', urlPath, 'filePath:', filePath, 'exists:', existsSync(filePath));
 
   // 防止路径穿越
   if (!filePath.startsWith(PUBLIC)) {
@@ -81,7 +96,7 @@ function serveStatic(res, urlPath) {
 //  JSON 响应辅助
 // ============================================================
 function json(res, status, data) {
-  res.writeHead(status, { 'Content-Type': 'application/json' });
+  res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(JSON.stringify(data));
 }
 
@@ -98,6 +113,102 @@ function parseBody(req) {
       } catch {
         resolve(null);
       }
+    });
+  });
+}
+
+async function parseMultipart(req) {
+  return new Promise((resolve) => {
+    const contentType = req.headers['content-type'] || '';
+    const match = contentType.match(/boundary=(.+)/);
+    if (!match) {
+      console.log('[DEBUG] parseMultipart: 未找到 boundary');
+      resolve({});
+      return;
+    }
+
+    const boundary = match[1].replace(/^["']|["']$/g, '');
+    const boundaryBuffer = Buffer.from(`--${boundary}\r\n`);
+    const endBoundaryBuffer = Buffer.from(`--${boundary}--`);
+    let body = Buffer.alloc(0);
+
+    req.on('data', (chunk) => {
+      body = Buffer.concat([body, chunk]);
+    });
+
+    req.on('end', () => {
+      const result = {};
+      
+      if (body.length === 0) {
+        console.log('[DEBUG] parseMultipart: body 为空');
+        resolve(result);
+        return;
+      }
+
+      const parts = [];
+      let start = 0;
+      
+      while (start < body.length) {
+        const boundaryIndex = body.indexOf(boundaryBuffer, start);
+        if (boundaryIndex === -1) break;
+        
+        start = boundaryIndex + boundaryBuffer.length;
+        
+        const nextBoundaryIndex = body.indexOf(boundaryBuffer, start);
+        const endIndex = body.indexOf(endBoundaryBuffer, start);
+        
+        let partEnd = -1;
+        if (nextBoundaryIndex !== -1 && endIndex !== -1) {
+          partEnd = Math.min(nextBoundaryIndex, endIndex);
+        } else if (nextBoundaryIndex !== -1) {
+          partEnd = nextBoundaryIndex;
+        } else if (endIndex !== -1) {
+          partEnd = endIndex;
+        } else {
+          partEnd = body.length;
+        }
+        
+        if (partEnd > start) {
+          parts.push(body.slice(start, partEnd));
+        }
+        
+        start = partEnd;
+      }
+
+      console.log('[DEBUG] parseMultipart: 找到', parts.length, '个 parts');
+
+      for (const partBuffer of parts) {
+        const partStr = partBuffer.toString('utf-8');
+        const headerEnd = partStr.indexOf('\r\n\r\n');
+        if (headerEnd === -1) continue;
+
+        const headers = partStr.substring(0, headerEnd);
+        const contentStart = headerEnd + 4;
+        const contentBuffer = partBuffer.slice(contentStart);
+
+        const nameMatch = headers.match(/name="([^"]+)"/);
+        const filenameMatch = headers.match(/filename="([^"]+)"/);
+
+        if (!nameMatch) continue;
+        const name = nameMatch[1];
+
+        console.log('[DEBUG] parseMultipart: 找到字段', name, filenameMatch ? '文件' : '普通字段');
+
+        if (filenameMatch) {
+          const filename = filenameMatch[1];
+          const contentBase64 = contentBuffer.toString('base64');
+          result[name] = { 
+            filename, 
+            content: contentBase64, 
+            size: contentBuffer.length 
+          };
+        } else {
+          result[name] = contentBuffer.toString('utf-8').replace(/\r\n$/, '');
+        }
+      }
+
+      console.log('[DEBUG] parseMultipart: 结果', Object.keys(result));
+      resolve(result);
     });
   });
 }
@@ -121,10 +232,175 @@ function parseBody(req) {
 //   { done: true }              — 对话完成
 //   { error: "..." }            — 错误
 //
+const UPLOADED_FILES = new Map();
+
+async function handleFileUpload(config, req, res) {
+  console.log('[DEBUG] 接收到文件上传请求');
+  const contentType = req.headers['content-type'] || '';
+  console.log('[DEBUG] Content-Type:', contentType);
+  
+  if (!contentType.startsWith('multipart/form-data')) {
+    console.log('[DEBUG] 错误：Content-Type 不是 multipart/form-data');
+    return json(res, 400, { error: '请使用 multipart/form-data 格式上传文件' });
+  }
+
+  const multipartData = await parseMultipart(req);
+  console.log('[DEBUG] parseMultipart 结果:', JSON.stringify(Object.keys(multipartData)));
+  
+  if (!multipartData.file) {
+    console.log('[DEBUG] 错误：未找到文件');
+    return json(res, 400, { error: '未找到文件' });
+  }
+
+  const { filename, content, size } = multipartData.file;
+  const fileId = Date.now().toString(36) + Math.random().toString(36).slice(2);
+  
+  UPLOADED_FILES.set(fileId, {
+    id: fileId,
+    filename,
+    content,
+    size,
+    uploadedAt: Date.now(),
+  });
+
+  json(res, 200, { 
+    success: true, 
+    fileId, 
+    filename, 
+    size,
+    message: '文件上传成功'
+  });
+}
+
+function handleFileDelete(config, req, res, fileId) {
+  if (UPLOADED_FILES.has(fileId)) {
+    UPLOADED_FILES.delete(fileId);
+    json(res, 200, { success: true, message: '文件已删除' });
+  } else {
+    json(res, 404, { error: '文件不存在' });
+  }
+}
+
 async function handleChat(config, req, res) {
-  const body = await parseBody(req);
+  let body;
+  const contentType = req.headers['content-type'] || '';
+  
+  if (contentType.startsWith('multipart/form-data')) {
+    const multipartData = await parseMultipart(req);
+    body = {};
+    if (multipartData.messages) {
+      try {
+        body.messages = JSON.parse(multipartData.messages);
+      } catch {
+        return json(res, 400, { error: 'messages 格式错误' });
+      }
+    }
+    if (multipartData.file) {
+      body.file = multipartData.file;
+    }
+  } else {
+    body = await parseBody(req);
+  }
+
   if (!body?.messages) {
     return json(res, 400, { error: '缺少 messages 字段' });
+  }
+
+  let uploadedFileContent = '';
+  let uploadedFileName = '';
+  
+  let fileData = body.file;
+  
+  if (body.fileId && UPLOADED_FILES.has(body.fileId)) {
+    const uploadedFile = UPLOADED_FILES.get(body.fileId);
+    fileData = {
+      filename: uploadedFile.filename,
+      content: uploadedFile.content,
+      size: uploadedFile.size
+    };
+  }
+  
+  if (fileData) {
+    try {
+      const buffer = Buffer.from(fileData.content, 'base64');
+      const ext = fileData.filename.toLowerCase().split('.').pop();
+      
+      switch (ext) {
+        case 'pdf': {
+          const pdfParseModule = await import('pdf-parse');
+          let pdfParse = pdfParseModule.default || pdfParseModule;
+          if (typeof pdfParse !== 'function') {
+            pdfParse = pdfParseModule.PDFParse ? (data) => {
+              const parser = new pdfParseModule.PDFParse(data);
+              return parser.getText();
+            } : pdfParseModule;
+          }
+          const pdfData = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.byteLength);
+          const pdfResult = await pdfParse(pdfData);
+          uploadedFileContent = typeof pdfResult === 'string' ? pdfResult : pdfResult.text;
+          break;
+        }
+        case 'docx': {
+          const mammoth = await import('mammoth');
+          const result = await mammoth.extractRawText({ arrayBuffer: buffer });
+          uploadedFileContent = result.value;
+          break;
+        }
+        case 'xlsx':
+        case 'xls': {
+          const XLSX = await import('xlsx');
+          const workbook = XLSX.read(buffer, { type: 'buffer' });
+          let text = '';
+          for (const sheetName of workbook.SheetNames) {
+            const sheet = workbook.Sheets[sheetName];
+            text += `\n=== 工作表: ${sheetName} ===\n`;
+            text += XLSX.utils.sheet_to_csv(sheet);
+          }
+          uploadedFileContent = text;
+          break;
+        }
+        case 'pptx': {
+          const JSZip = await import('jszip');
+          const zip = await JSZip.loadAsync(buffer);
+          let text = '';
+          const slideFiles = Object.keys(zip.files)
+            .filter(f => f.match(/^ppt\/slides\/slide\d+\.xml$/))
+            .sort((a, b) => {
+              const numA = parseInt(a.match(/slide(\d+)/)[1]);
+              const numB = parseInt(b.match(/slide(\d+)/)[1]);
+              return numA - numB;
+            });
+          for (const slideFile of slideFiles) {
+            const xml = await zip.file(slideFile).async('string');
+            const slideNum = slideFile.match(/slide(\d+)/)[1];
+            text += `\n=== 幻灯片 ${slideNum} ===\n`;
+            const matches = xml.match(/<a:t>[^<]*<\/a:t>/g);
+            if (matches) {
+              text += matches.map(m => m.replace(/<[^>]*>/g, '')).join(' ') + '\n';
+            }
+          }
+          uploadedFileContent = text;
+          break;
+        }
+        case 'txt':
+        case 'md':
+        case 'json':
+        case 'csv':
+          uploadedFileContent = buffer.toString('utf-8');
+          break;
+        case 'html':
+        case 'htm':
+          uploadedFileContent = buffer.toString('utf-8').replace(/<[^>]*>/g, ' ');
+          break;
+        case 'doc':
+        case 'ppt':
+        default:
+          uploadedFileContent = buffer.toString('utf-8');
+      }
+      uploadedFileName = fileData.filename;
+    } catch (e) {
+      return json(res, 400, { error: '文件解析失败: ' + e.message });
+    }
   }
 
   // 复制消息数组（不污染请求原数据）
@@ -145,15 +421,28 @@ async function handleChat(config, req, res) {
     }
   }
 
-  // RAG 检索：搜索知识库获取相关上下文
   let ragContext = '';
-  if (latestQuestion) {
-    const knowledgeResults = await searchKnowledge(latestQuestion, config);
+  const stats = getKnowledgeStats();
+  
+  if (uploadedFileContent) {
+    const fileSnippet = uploadedFileContent.slice(0, 3000);
+    ragContext = `\n\n---\n用户上传了文件【${uploadedFileName}】，文件内容如下：\n${fileSnippet}\n${uploadedFileContent.length > 3000 ? '\n...（内容过长，仅显示前3000字符）\n' : ''}---\n`;
+  } else if (stats.documentCount > 0) {
+    const knowledgeResults = latestQuestion 
+      ? await searchKnowledge(latestQuestion, config)
+      : [];
+    
     if (knowledgeResults.length > 0) {
       const contextSnippets = knowledgeResults.map((r, i) => 
         `[知识库片段 ${i + 1}] (相似度: ${(r.similarity * 100).toFixed(1)}%)\n${r.content}\n`
       ).join('\n');
       ragContext = `\n\n---\n基于以下知识库内容回答问题：\n${contextSnippets}\n---\n`;
+    } else {
+      const documents = getDocuments();
+      if (documents.length > 0) {
+        const docNames = documents.map(d => d.name).join(', ');
+        ragContext = `\n\n---\n用户已上传以下文档，请主动提供分析服务：${docNames}\n---\n`;
+      }
     }
   }
 
@@ -186,9 +475,11 @@ async function handleChat(config, req, res) {
     if (res.flush) res.flush();
   }
 
-  const MAX_TOOL_ROUNDS = 5;
+  const MAX_TOOL_ROUNDS = 15;
   let totalContent = '';
   let usage = null;
+  const searchHistory = [];  // 记录已搜索的关键词，避免重复搜索
+  const MAX_SEARCH_ATTEMPTS = 3;  // 最多允许3次搜索，超过则强制回答
 
   try {
     // ─── Agent 循环 ───
@@ -299,6 +590,49 @@ async function handleChat(config, req, res) {
             fnArgs = {};
           }
 
+          // ── 搜索历史检测 ──
+          if (fnName === 'web_search' && fnArgs.query) {
+            const query = fnArgs.query.trim().toLowerCase();
+            
+            // 检查是否与之前的搜索相似（简单关键词重叠检测）
+            const isDuplicate = searchHistory.some(prev => {
+              const prevWords = new Set(prev.toLowerCase().split(/\s+/));
+              const currWords = query.split(/\s+/);
+              let overlapCount = 0;
+              for (const word of currWords) {
+                if (prevWords.has(word) && word.length > 1) overlapCount++;
+              }
+              // 如果有60%以上的词重叠，认为是重复搜索
+              return currWords.length > 0 && overlapCount / currWords.length > 0.6;
+            });
+
+            if (isDuplicate) {
+              // 返回"已搜索过"的提示，不让AI继续浪费轮次
+              sseSend({
+                type: 'tool_call',
+                tool_call_id: tc.id,
+                name: fnName,
+                arguments: fnArgs,
+              });
+              const toolResult = `这个搜索请求与之前的搜索过于相似，请基于已有的搜索结果回答问题，不要再重复搜索。`;
+              sseSend({
+                type: 'tool_result',
+                tool_call_id: tc.id,
+                name: fnName,
+                result: toolResult,
+              });
+              messages.push({
+                role: 'tool',
+                tool_call_id: tc.id,
+                content: toolResult,
+              });
+              continue;
+            }
+
+            // 记录搜索历史
+            searchHistory.push(query);
+          }
+
           // 通知前端：开始调用工具
           sseSend({
             type: 'tool_call',
@@ -331,6 +665,17 @@ async function handleChat(config, req, res) {
           });
         }
 
+        // ── 强制回答检测：如果已搜索3次以上，添加提示让AI直接回答 ──
+        const searchCount = searchHistory.length;
+        if (searchCount >= MAX_SEARCH_ATTEMPTS) {
+          messages.push({
+            role: 'user',
+            content: '请基于上面所有的搜索结果，直接回答用户的问题。不要再进行任何新的搜索，综合所有已有的信息给出完整的答案。',
+          });
+          // 重置搜索计数，只强制一次
+          searchHistory.length = 0;
+        }
+
         // 继续下一轮（AI 基于工具结果回答）
         continue;
       }
@@ -341,8 +686,8 @@ async function handleChat(config, req, res) {
       return;
     }
 
-    // 达到最大轮次（极少情况）
-    sseSend({ error: '达到最大工具调用轮次，请简化问题重试' });
+    // 达到最大轮次
+    sseSend({ error: 'AI 思考时间过长，请尝试更具体的问题' });
     res.end();
 
   } catch (err) {
@@ -353,6 +698,16 @@ async function handleChat(config, req, res) {
 }
 
 // GET /api/config — 获取当前配置信息（不暴露 API Key）
+// GET /health — 健康检查
+function handleHealthCheck(req, res) {
+  json(res, 200, {
+    status: 'ok',
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+    version: '2.0.0',
+  });
+}
+
 function handleGetConfig(config, req, res) {
   json(res, 200, {
     provider: config.provider,
@@ -409,7 +764,6 @@ async function handleSaveConversation(config, req, res) {
   }
 
   const filename = saveConversation(name, body.messages);
-  console.log(`[保存对话] ${filename}, 消息数: ${body.messages.length}`);
   json(res, 200, { success: true, filename });
 }
 
@@ -485,10 +839,7 @@ async function handleKnowledgeUpload(config, req, res) {
     return json(res, 400, { error: '未找到文件' });
   }
 
-  const tempPath = join(__dirname, 'tmp', fileName);
-  if (!existsSync(join(__dirname, 'tmp'))) {
-    mkdirSync(join(__dirname, 'tmp'), { recursive: true });
-  }
+  const tempPath = join(TMP_DIR, fileName);
   writeFileSync(tempPath, fileData);
 
   try {
@@ -525,6 +876,9 @@ async function handleKnowledgeSearch(config, req, res) {
 //  路由分发
 // ============================================================
 function matchRoute(method, url) {
+  // GET /health — 健康检查（部署必需）
+  if (method === 'GET' && url === '/health') return { handler: 'health' };
+
   // GET /api/config
   if (method === 'GET' && url === '/api/config') return { handler: 'getConfig' };
 
@@ -570,6 +924,15 @@ function matchRoute(method, url) {
     return { handler: 'knowledgeDelete', docId: decodeURIComponent(docMatch[1]) };
   }
 
+  // POST /api/files/upload
+  if (method === 'POST' && url === '/api/files/upload') return { handler: 'handleFileUpload' };
+
+  // DELETE /api/files/:id
+  const fileMatch = url.match(/^\/api\/files\/(.+)$/);
+  if (fileMatch && method === 'DELETE') {
+    return { handler: 'handleFileDelete', fileId: decodeURIComponent(fileMatch[1]) };
+  }
+
   return null;
 }
 
@@ -587,6 +950,8 @@ export function startServer(port = 3000) {
     const route = matchRoute(method, url);
     if (route) {
       switch (route.handler) {
+        case 'health':
+          return handleHealthCheck(req, res);
         case 'chat':
           return handleChat(config, req, res);
         case 'getConfig':
@@ -613,6 +978,10 @@ export function startServer(port = 3000) {
           return handleKnowledgeClear(req, res);
         case 'knowledgeSearch':
           return handleKnowledgeSearch(config, req, res);
+        case 'handleFileUpload':
+          return handleFileUpload(config, req, res);
+        case 'handleFileDelete':
+          return handleFileDelete(config, req, res, route.fileId);
       }
     }
 
@@ -643,93 +1012,4 @@ export function startServer(port = 3000) {
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const port = parseInt(process.env.PORT) || 3000;
   startServer(port);
-}
-
-export default async function handler(req, res) {
-  // DEBUG: 确认函数被调用
-  console.log('[DEBUG] handler invoked, url:', req.url, 'method:', req.method);
-
-  let config;
-  try {
-    config = loadConfig();
-    console.log('[DEBUG] config loaded, provider:', config.provider);
-  } catch (err) {
-    // 配置错误时返回友好提示页面，而不是直接崩溃
-    console.error('[DEBUG] config error:', err.message);
-    if (err.code === 'CONFIG_MISSING') {
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(`<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Egg Chat — 配置提醒</title>
-<style>
-  body { font-family: system-ui; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; background: #fefaf0; color: #333; }
-  .card { background: #fff; border-radius: 16px; padding: 40px; max-width: 480px; text-align: center; box-shadow: 0 2px 20px rgba(0,0,0,0.08); }
-  .egg { font-size: 64px; margin-bottom: 16px; }
-  h1 { font-size: 22px; margin: 0 0 8px; }
-  .hint { color: #888; font-size: 14px; margin-top: 20px; background: #fffbe6; padding: 12px; border-radius: 8px; text-align: left; line-height: 1.6; }
-  code { background: #f0e8d8; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
-</style>
-</head>
-<body>
-<div class="card">
-  <div class="egg">🥚</div>
-  <h1>蛋蛋需要配置才能孵出来！</h1>
-  <p style="color:#666;">${err.message}</p>
-  <div class="hint">
-    请在 Vercel 项目设置中添加环境变量:<br>
-    <code>API_KEY</code> — 你的 API Key<br>
-    <code>PROVIDER</code> — deepseek<br>
-    <code>BASE_URL</code> — https://api.deepseek.com/v1<br>
-    <code>MODEL</code> — deepseek-chat
-  </div>
-</div>
-</body>
-</html>`);
-      return;
-    }
-    res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
-    res.end('Internal Server Error');
-    return;
-  }
-
-  const urlPath = req.url.startsWith('http') ? new URL(req.url).pathname : req.url;
-  const method = req.method;
-
-  const route = matchRoute(method, urlPath);
-  if (route) {
-    switch (route.handler) {
-      case 'chat':
-        return handleChat(config, req, res);
-      case 'getConfig':
-        return handleGetConfig(config, req, res);
-      case 'setModel':
-        return handleSetModel(config, req, res);
-      case 'listConversations':
-        return handleListConversations(req, res);
-      case 'loadConversation':
-        return handleLoadConversation(req, res, route.name);
-      case 'deleteConversation':
-        return handleDeleteConversation(req, res, route.name);
-      case 'saveConversation':
-        return handleSaveConversation(config, req, res);
-      case 'knowledgeStats':
-        return handleKnowledgeStats(req, res);
-      case 'knowledgeDocs':
-        return handleKnowledgeDocs(req, res);
-      case 'knowledgeUpload':
-        return handleKnowledgeUpload(config, req, res);
-      case 'knowledgeDelete':
-        return handleKnowledgeDelete(req, res, route.docId);
-      case 'knowledgeClear':
-        return handleKnowledgeClear(req, res);
-      case 'knowledgeSearch':
-        return handleKnowledgeSearch(config, req, res);
-    }
-  }
-
-  serveStatic(res, urlPath);
-  console.log('[DEBUG] served static:', urlPath);
 }
