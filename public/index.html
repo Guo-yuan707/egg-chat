@@ -79,9 +79,10 @@
       margin-bottom: 14px;
     }
     .sidebar-header .brand .mascot {
-      font-size: 36px;
       line-height: 1;
       filter: drop-shadow(0 2px 4px rgba(0,0,0,.1));
+      border-radius: 50%;
+      object-fit: cover;
     }
     .sidebar-header .brand h1 {
       font-size: 20px;
@@ -252,7 +253,7 @@
       background: rgba(255,255,255,.4);
       backdrop-filter: blur(10px);
     }
-    .chat-header .mascot-sm { font-size:24px;line-height:1 }
+    .chat-header .mascot-sm { line-height:1; border-radius:50%; object-fit:cover }
     .chat-header .title { font-weight:600;color:var(--text-primary) }
 
     .btn-sidebar-toggle {
@@ -302,8 +303,16 @@
       border: 2px solid #f0c080;
     }
     .msg-avatar.ai {
-      background: linear-gradient(135deg, #fef3e0, #fde8d0);
-      border: 2px solid #f0d8b0;
+      background: transparent;
+      border: none;
+      overflow: hidden;
+      padding: 0;
+    }
+    .msg-avatar.ai img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 14px;
     }
 
     .msg-bubble {
@@ -740,7 +749,7 @@
       gap: 10px;
       padding: 40px 20px;
     }
-    .empty-state .mascot-big { width:120px;height:120px;margin:0 auto;display:block }
+    .empty-state .mascot-big { width:120px;height:120px;margin:0 auto;display:block;border-radius:50%;object-fit:cover }
     .empty-state h2 { font-size:22px;color:var(--text-primary);margin-bottom:2px }
     .empty-state p { font-size:14px;max-width:380px;line-height:1.7 }
     .empty-state .quick-actions {
@@ -848,7 +857,7 @@
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <div class="brand">
-        <svg class="mascot" viewBox="0 0 50 50" width="28" height="28"><use href="#egg-icon"/></svg>
+        <img class="mascot" src="/assets/egg-new.png" width="28" height="28" alt="Egg">
         <h1>Egg</h1>
         <span class="ver">v2.0</span>
       </div>
@@ -879,7 +888,7 @@
     <!-- Header -->
     <div class="chat-header">
       <button class="btn-sidebar-toggle" onclick="toggleSidebar()">☰</button>
-      <svg class="mascot-sm" viewBox="0 0 50 50" width="32" height="32"><use href="#egg-icon"/></svg>
+      <img class="mascot-sm" src="/assets/egg-new.png" width="32" height="32" alt="Egg">
       <span class="title">Egg 在线</span>
       <span class="title" id="headerTitle" style="font-weight:400"></span>
     </div>
@@ -890,15 +899,9 @@
     <!-- Messages -->
     <div class="messages" id="messages">
       <div class="empty-state" id="emptyState">
-        <svg class="mascot-big" viewBox="0 0 50 50" width="100" height="100"><use href="#egg-icon"/></svg>
+        <img class="mascot-big" src="/assets/egg-new.png" width="100" height="100" alt="Egg">
         <h2>嗨～我是 Egg！</h2>
         <p>一颗会思考的蛋。还没孵出来，但已经很聪明了！问什么都会尽力帮你～</p>
-        <div class="quick-actions">
-          <button class="quick-btn" onclick="quickAsk('计算 sin(pi/4) * 100 + sqrt(256)')">🧮 复杂计算</button>
-          <button class="quick-btn" onclick="quickAsk('现在几点？纽约现在是什么时间？')">🕐 查时间</button>
-          <button class="quick-btn" onclick="quickAsk('搜索最近关于 AI Agent 的新闻')">🔍 联网搜索</button>
-          <button class="quick-btn" onclick="quickAsk('用 Python 写一个冒泡排序')">💻 写代码</button>
-        </div>
       </div>
     </div>
 
@@ -930,9 +933,7 @@
           <div class="upload-progress-bar" id="uploadProgressBar"></div>
         </div>
       </div>
-      <div class="input-hint" id="inputHint">
-        按 <kbd>Enter</kbd> 发送 · <kbd>Shift+Enter</kbd> 换行 · <kbd>Ctrl+S</kbd> 保存 · 📎 上传文档
-      </div>
+
     </div>
   </div>
 
@@ -991,8 +992,7 @@
           `<option value="${m}" ${m === state.config.model ? 'selected' : ''}>${m}</option>`
         ).join('');
 
-        headerTitle.textContent = `— ${state.config.providerName} · ${state.config.model}`;
-        sidebarFooter.innerHTML = `<span class="status-dot"></span> ${state.config.providerName} · ${state.config.model}`;
+        sidebarFooter.innerHTML = `<span class="status-dot"></span> 在线`;
 
         newChat(false);
         refreshConvList();
@@ -1134,8 +1134,7 @@
         body: JSON.stringify({ model }),
       });
       state.config.model = model;
-      headerTitle.textContent = `— ${state.config.providerName} · ${model}`;
-      sidebarFooter.innerHTML = `<span class="status-dot"></span> ${state.config.providerName} · ${model}`;
+      sidebarFooter.innerHTML = `<span class="status-dot"></span> 在线`;
       toastMsg('🧠 已切换至 ' + model);
     }
 
@@ -1484,15 +1483,9 @@
       if (visible.length === 0) {
         messagesEl.innerHTML = `
           <div class="empty-state" id="emptyState">
-            <svg class="mascot-big" viewBox="0 0 50 50" width="100" height="100"><use href="#egg-icon"/></svg>
+            <img class="mascot-big" src="/assets/egg-new.png" width="100" height="100" alt="Egg">
             <h2>嗨～我是 Egg！</h2>
             <p>一颗会思考的蛋。还没孵出来，但已经很聪明了！问什么都会尽力帮你～</p>
-            <div class="quick-actions">
-              <button class="quick-btn" onclick="quickAsk('计算 sin(pi/4) * 100 + sqrt(256)')">🧮 复杂计算</button>
-              <button class="quick-btn" onclick="quickAsk('现在几点？纽约现在是什么时间？')">🕐 查时间</button>
-              <button class="quick-btn" onclick="quickAsk('搜索最近关于 AI Agent 的新闻')">🔍 联网搜索</button>
-              <button class="quick-btn" onclick="quickAsk('用 Python 写一个冒泡排序')">💻 写代码</button>
-            </div>
           </div>`;
         return;
       }
@@ -1557,7 +1550,7 @@
 
           const avatarSVG = isUser 
             ? '<span style="font-size:20px">👩</span>'
-            : '<svg viewBox="0 0 50 50" width="32" height="32"><use href="#egg-icon"/></svg>';
+            : '<img src="/assets/egg-new.png" width="32" height="32" alt="Egg">';
           const avatarClass = isUser ? 'user' : 'ai';
           const rowClass = isUser ? 'user-row' : '';
           
