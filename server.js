@@ -707,9 +707,12 @@ async function handleChat(config, req, res) {
 
 // GET /api/config — 获取当前配置信息（不暴露 API Key）
 // GET /health — 健康检查
-function handleHealthCheck(req, res) {
-  json(res, 200, {
-    status: 'ok',
+function handleHealthCheck(config, req, res) {
+  const hasConfig = config && !config.error;
+  json(res, hasConfig ? 200 : 503, {
+    status: hasConfig ? 'ok' : 'degraded',
+    configValid: hasConfig,
+    configError: config?.error || null,
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
     version: '2.0.0',
@@ -717,6 +720,9 @@ function handleHealthCheck(req, res) {
 }
 
 function handleGetConfig(config, req, res) {
+  if (config.error) {
+    return json(res, 503, { error: config.error });
+  }
   json(res, 200, {
     provider: config.provider,
     providerName: config.providerName,
@@ -985,10 +991,21 @@ function matchRoute(method, url) {
 //  启动服务器
 // ============================================================
 export function startServer(port = 3000) {
-  const config = loadConfig();
+  let config;
+  try {
+    config = loadConfig();
+  } catch (err) {
+    console.error('[配置错误]', err.message);
+    config = { error: err.message, provider: 'unknown', model: 'unknown', apiKey: '' };
+  }
 
-  // 尝试将旧 JSON 文件迁移到 SQLite
-  ensureMigration();
+  // 尝试将旧 JSON 文件迁移到 SQLite（失败不影响启动）
+  try { ensureMigration(); } catch {}
+
+  // 如果配置错误，仍启动服务器，但健康检查会返回警告
+  if (config.error) {
+    console.warn('[警告] 配置未正确加载，服务器将以降级模式启动');
+  }
 
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, `http://localhost:${port}`).pathname;
@@ -999,7 +1016,7 @@ export function startServer(port = 3000) {
     if (route) {
       switch (route.handler) {
         case 'health':
-          return handleHealthCheck(req, res);
+          return handleHealthCheck(config, req, res);
         case 'chat':
           return handleChat(config, req, res);
         case 'getConfig':
@@ -1046,8 +1063,11 @@ export function startServer(port = 3000) {
       console.log('  ║  🤖 AI Chat Web v2.0                     ║');
       console.log('  ║                                           ║');
       console.log(`  ║  服务地址: http://localhost:${port}          ║`);
-      console.log(`  ║  AI 平台: ${config.providerName.padEnd(31)}║`);
-      console.log(`  ║  模型:    ${config.model.padEnd(31)}║`);
+      console.log(`  ║  AI 平台: ${(config.providerName || '未配置').padEnd(28)}║`);
+      console.log(`  ║  模型:    ${(config.model || '未配置').padEnd(28)}║`);
+      if (config.error) {
+        console.log('  ║  ⚠️  配置错误: ' + config.error.slice(0, 25) + ' ║');
+      }
       console.log('  ╚═══════════════════════════════════════════╝');
       console.log('');
       console.log('  按 Ctrl+C 停止服务器');
@@ -1066,9 +1086,23 @@ export function startServer(port = 3000) {
   });
 }
 
+// 全局异常处理，防止进程崩溃
+process.on('uncaughtException', (err) => {
+  console.error('[未捕获异常]', err.message);
+  console.error(err.stack);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[未处理的Promise拒绝]', reason);
+});
+
 // 作为模块导出时，不自动启动；
 // 直接运行时启动
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const port = parseInt(process.env.PORT) || 3000;
-  startServer(port);
+  startServer(port).catch((err) => {
+    console.error('[启动失败]', err.message);
+    console.error(err.stack);
+    process.exit(1);
+  });
 }
