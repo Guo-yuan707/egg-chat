@@ -1186,6 +1186,10 @@
     const headerTitle = $('#headerTitle');
     const sidebarFooter = $('#sidebarFooter');
 
+    // ── 智能滚动状态 ──
+    const SCROLL_THRESHOLD = 50;
+    let shouldAutoScroll = true;
+
     // ── Init ──
     (async function init() {
       try {
@@ -1945,12 +1949,14 @@
 
     // ── 工具 ──
     function scrollBottom() {
+      if (!shouldAutoScroll) return;
       messagesEl.scrollTop = messagesEl.scrollHeight;
       updateScrollButton();
     }
 
     function scrollToBottom() {
       messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: 'smooth' });
+      shouldAutoScroll = true;
     }
 
     function updateScrollButton() {
@@ -1959,9 +1965,12 @@
       const distance = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
       if (distance > 300) btn.classList.add('show');
       else btn.classList.remove('show');
+
+      // 智能滚动：距底部小于阈值时跟随滚动，超过阈值时暂停
+      shouldAutoScroll = distance <= SCROLL_THRESHOLD;
     }
 
-    // 监听滚动，控制按钮显示
+    // 监听滚动，控制按钮显示 + 自动跟随
     messagesEl.addEventListener('scroll', updateScrollButton);
 
 
