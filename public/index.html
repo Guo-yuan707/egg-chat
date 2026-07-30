@@ -954,6 +954,53 @@
       return userId;
     }
     const USER_ID = getOrCreateUserId();
+    const LOCAL_CONV_KEY = 'egg_conversations_' + USER_ID;
+
+    // ── 本地缓存（作为服务器存储的备份）──
+    function saveToLocalCache(name, messages) {
+      try {
+        const convs = JSON.parse(localStorage.getItem(LOCAL_CONV_KEY) || '[]');
+        const idx = convs.findIndex(c => c.name === name);
+        const data = { name, messages, savedAt: Date.now() };
+        if (idx >= 0) convs[idx] = data;
+        else convs.unshift(data);
+        localStorage.setItem(LOCAL_CONV_KEY, JSON.stringify(convs.slice(0, 50)));
+      } catch {}
+    }
+
+    function loadFromLocalCache() {
+      try {
+        return JSON.parse(localStorage.getItem(LOCAL_CONV_KEY) || '[]');
+      } catch {
+        return [];
+      }
+    }
+
+    function getLocalConvList() {
+      return loadFromLocalCache().map(c => ({
+        filename: c.name + '.json',
+        name: c.name,
+        savedAt: new Date(c.savedAt).toISOString(),
+        messageCount: c.messages?.length || 0,
+        preview: c.messages?.find(m => m.role === 'user')?.content?.toString().slice(0, 30) || '未命名对话'
+      }));
+    }
+
+    function loadLocalConv(name) {
+      const convs = loadFromLocalCache();
+      const conv = convs.find(c => c.name === name);
+      return conv ? {
+        version: '2.0',
+        savedAt: new Date(conv.savedAt).toISOString(),
+        messageCount: conv.messages.length,
+        messages: conv.messages
+      } : null;
+    }
+
+    function deleteLocalConv(name) {
+      const convs = loadFromLocalCache().filter(c => c.name !== name);
+      localStorage.setItem(LOCAL_CONV_KEY, JSON.stringify(convs));
+    }
 
     // ── State ──
     const state = {
@@ -1056,55 +1103,72 @@
     }
 
     async function refreshConvList() {
+      let list = [];
       try {
         const res = await fetch('/api/conversations?userId=' + encodeURIComponent(USER_ID));
-        const list = await res.json();
-        convList.innerHTML = list.length > 0
-          ? list.map(c => {
-              const date = c.savedAt ? new Date(c.savedAt).toLocaleDateString('zh-CN', {
-                month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'
-              }) : '';
-              const display = c.name.startsWith('chat-')
-                ? (c.preview || '未命名对话')
-                : c.name;
-              const icon = ['🥚','🦊','🐱','🐶','🐼','🦄','🐸','🐙','🐝','🌸'][Math.floor(Math.random()*10)];
-              return `
-                <div class="conv-item${c.name === state.convName ? ' active' : ''}" onclick="loadConv('${c.name}')">
-                  <span class="conv-item-icon">${icon}</span>
-                  <span class="conv-item-title">${escapeHtml(display)}</span>
-                  <span class="conv-item-date">${date}</span>
-                  <button class="conv-item-del" onclick="event.stopPropagation();deleteConv('${c.name}')" title="删除">×</button>
-                </div>`;
-            }).join('')
-          : '<div style="padding:24px;text-align:center;color:var(--text-dim);font-size:13px">✨ 开始你的第一段对话吧</div>';
-      } catch {}
+        list = await res.json();
+      } catch {
+        // 服务器失败时使用本地缓存
+        list = getLocalConvList();
+      }
+      
+      convList.innerHTML = list.length > 0
+        ? list.map(c => {
+            const date = c.savedAt ? new Date(c.savedAt).toLocaleDateString('zh-CN', {
+              month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'
+            }) : '';
+            const display = c.name.startsWith('chat-')
+              ? (c.preview || '未命名对话')
+              : c.name;
+            const icon = ['🥚','🦊','🐱','🐶','🐼','🦄','🐸','🐙','🐝','🌸'][Math.floor(Math.random()*10)];
+            return `
+              <div class="conv-item${c.name === state.convName ? ' active' : ''}" onclick="loadConv('${c.name}')">
+                <span class="conv-item-icon">${icon}</span>
+                <span class="conv-item-title">${escapeHtml(display)}</span>
+                <span class="conv-item-date">${date}</span>
+                <button class="conv-item-del" onclick="event.stopPropagation();deleteConv('${c.name}')" title="删除">×</button>
+              </div>`;
+          }).join('')
+        : '<div style="padding:24px;text-align:center;color:var(--text-dim);font-size:13px">✨ 开始你的第一段对话吧</div>';
     }
 
     async function loadConv(name) {
       if (state.isStreaming) return;
+      let data = null;
       try {
         const res = await fetch('/api/conversations/' + encodeURIComponent(name) + '?userId=' + encodeURIComponent(USER_ID));
-        if (!res.ok) { toastMsg('对话不存在 😢'); return; }
-        const data = await res.json();
-        state.messages = data.messages;
-        state.convName = name;
-        renderMessages();
-        emptyState = $('#emptyState');
-        if (emptyState) emptyState.style.display = 'none';
-        scrollBottom();
-        refreshConvList();
-        toastMsg('📂 已加载');
-      } catch { toastMsg('加载失败 😢'); }
+        if (res.ok) data = await res.json();
+      } catch {
+        // 服务器失败时使用本地缓存
+        data = loadLocalConv(name);
+      }
+      
+      if (!data) { toastMsg('对话不存在 😢'); return; }
+      state.messages = data.messages;
+      state.convName = name;
+      renderMessages();
+      emptyState = $('#emptyState');
+      if (emptyState) emptyState.style.display = 'none';
+      scrollBottom();
+      refreshConvList();
+      toastMsg('📂 已加载');
     }
 
     async function deleteConv(name) {
-      await fetch('/api/conversations/' + encodeURIComponent(name) + '?userId=' + encodeURIComponent(USER_ID), { method: 'DELETE' });
+      await fetch('/api/conversations/' + encodeURIComponent(name) + '?userId=' + encodeURIComponent(USER_ID), { method: 'DELETE' }).catch(() => {});
+      deleteLocalConv(name); // 同时删除本地缓存
       if (state.convName === name) newChat(false);
       refreshConvList();
       toastMsg('🗑️ 已删除');
     }
 
     async function saveConvSilent() {
+      // 如果没有对话名，先生成一个
+      if (!state.convName) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+        state.convName = 'chat-' + timestamp;
+      }
+      
       try {
         const res = await fetch('/api/conversations', {
           method: 'POST',
@@ -1115,10 +1179,12 @@
           const data = await res.json();
           if (data.filename) {
             state.convName = data.filename.replace('.json', '');
-            refreshConvList();
           }
         }
       } catch {}
+      // 无论服务器保存是否成功，都保存到本地缓存
+      saveToLocalCache(state.convName, state.messages);
+      refreshConvList();
     }
 
     async function saveConv() {
