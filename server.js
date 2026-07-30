@@ -15,7 +15,15 @@ import {
   loadConversation as loadConv,
   listConversations,
   deleteConversation as deleteConv,
+  ensureMigration,
 } from './lib/storage.js';
+
+// SQLite 优雅关闭（如果可用）
+let closeDatabase = null;
+try {
+  const dbModule = await import('./lib/db.js');
+  closeDatabase = dbModule.closeDatabase;
+} catch {}
 import { TOOLS, executeTool } from './lib/tools.js';
 import {
   addDocument,
@@ -774,6 +782,30 @@ async function handleSaveConversation(config, req, res) {
   json(res, 200, { success: true, filename });
 }
 
+// PUT /api/conversations/:name/rename — 重命名对话
+async function handleRenameConversation(req, res, name) {
+  const body = await parseBody(req);
+  const newName = body?.newName;
+  if (!newName) return json(res, 400, { error: '缺少 newName 字段' });
+
+  const urlObj = new URL(req.url, 'http://localhost');
+  const userId = urlObj.searchParams.get('userId') || 'default';
+
+  // 加载原对话
+  const data = loadConv(name, userId);
+  if (!data) return json(res, 404, { error: '对话不存在' });
+
+  // 检查新名称是否已存在
+  const existing = loadConv(newName, userId);
+  if (existing) return json(res, 409, { error: '对话名称已存在' });
+
+  // 保存新名称，删除旧的
+  saveConversation(newName, data.messages, userId);
+  deleteConv(name, userId);
+
+  json(res, 200, { success: true, name: newName });
+}
+
 // ============================================================
 //  RAG 知识库 API
 // ============================================================
@@ -910,6 +942,12 @@ function matchRoute(method, url) {
     if (method === 'DELETE') return { handler: 'deleteConversation', name };
   }
 
+  // PUT /api/conversations/:name/rename
+  const renameMatch = url.match(/^\/api\/conversations\/(.+)\/rename$/);
+  if (renameMatch && method === 'PUT') {
+    return { handler: 'renameConversation', name: decodeURIComponent(renameMatch[1]) };
+  }
+
   // GET /api/knowledge/stats
   if (method === 'GET' && url === '/api/knowledge/stats') return { handler: 'knowledgeStats' };
 
@@ -949,6 +987,9 @@ function matchRoute(method, url) {
 export function startServer(port = 3000) {
   const config = loadConfig();
 
+  // 尝试将旧 JSON 文件迁移到 SQLite
+  ensureMigration();
+
   const server = createServer(async (req, res) => {
     const url = new URL(req.url, `http://localhost:${port}`).pathname;
     const method = req.method;
@@ -973,6 +1014,8 @@ export function startServer(port = 3000) {
           return handleDeleteConversation(req, res, route.name);
         case 'saveConversation':
           return handleSaveConversation(config, req, res);
+        case 'renameConversation':
+          return handleRenameConversation(req, res, route.name);
         case 'knowledgeStats':
           return handleKnowledgeStats(req, res);
         case 'knowledgeDocs':
@@ -1009,6 +1052,15 @@ export function startServer(port = 3000) {
       console.log('');
       console.log('  按 Ctrl+C 停止服务器');
       console.log('');
+
+      // 优雅退出：关闭数据库连接
+      const shutdown = () => {
+        if (closeDatabase) { closeDatabase(); console.log('  数据库连接已关闭'); }
+        server.close(() => process.exit(0));
+      };
+      process.on('SIGTERM', shutdown);
+      process.on('SIGINT', shutdown);
+
       resolve(server);
     });
   });

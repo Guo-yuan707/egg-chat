@@ -43,6 +43,40 @@
       --shadow-lg:         0 8px 32px rgba(0,0,0,.08);
     }
 
+    /* ── 暗色主题 ── */
+    [data-theme="dark"] {
+      --bg-primary:        #1a1a2e;
+      --bg-sidebar:        #16162a;
+      --bg-chat:           #1e1e32;
+      --bg-input:          #252540;
+      --bg-bubble-user:    #3d2a2a;
+      --bg-bubble-ai:      #2a2a42;
+      --bg-code:           #1a1a30;
+      --border:            #3a3a55;
+      --border-light:      #2e2e48;
+      --text-primary:      #e0d8c8;
+      --text-secondary:    #b0a590;
+      --text-dim:          #7a7060;
+      --accent:            #f0973b;
+      --accent-soft:       #3d2a1a;
+      --accent-hover:      #f5a84e;
+      --danger:            #e0556a;
+      --danger-soft:       #3d1a20;
+      --green:             #5b9a68;
+      --green-soft:        #1a2d1e;
+      --shadow-sm:         0 1px 3px rgba(0,0,0,.2), 0 1px 2px rgba(0,0,0,.15);
+      --shadow-md:         0 4px 16px rgba(0,0,0,.25), 0 2px 4px rgba(0,0,0,.15);
+      --shadow-lg:         0 8px 32px rgba(0,0,0,.35);
+    }
+
+    /* ── 暗色主题下的特殊覆盖 ── */
+    [data-theme="dark"] .msg-bubble.user { border-color: #5a3a2a; }
+    [data-theme="dark"] .chat-header { background: rgba(26,26,46,.6); }
+    [data-theme="dark"] .toast { color: #1a1a2e; background: #e0d8c8; }
+    [data-theme="dark"] .msg-content code:not(pre code) { color: #f5a84e; }
+    [data-theme="dark"] .conv-item.active { color: #f5a84e; }
+    [data-theme="dark"] .sidebar-footer { border-top-color: var(--border); }
+
     html,body{height:100%;overflow:hidden}
 
     body {
@@ -213,6 +247,18 @@
       opacity:1!important;
       background: var(--danger-soft);
     }
+    .conv-item-title-edit {
+      flex: 1;
+      background: var(--bg-input);
+      border: 1.5px solid var(--accent);
+      border-radius: 6px;
+      padding: 2px 8px;
+      font-size: 13px;
+      color: var(--text-primary);
+      font-family: inherit;
+      outline: none;
+      min-width: 0;
+    }
 
     .sidebar-footer {
       padding: 14px 16px;
@@ -222,6 +268,27 @@
       display: flex;
       align-items: center;
       gap: 8px;
+    }
+    .btn-theme-toggle {
+      width: 36px; height: 36px;
+      border-radius: 50%;
+      background: var(--bg-input);
+      border: 1.5px solid var(--border);
+      cursor: pointer;
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all .2s;
+      line-height: 1;
+      padding: 0;
+      margin-left: auto;
+      flex-shrink: 0;
+    }
+    .btn-theme-toggle:hover {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      transform: rotate(15deg);
     }
     .sidebar-footer .status-dot {
       width: 9px;height: 9px;
@@ -273,6 +340,7 @@
       flex: 1;
       overflow-y: auto;
       padding: 24px 0;
+      position: relative;
     }
     .messages::-webkit-scrollbar{width:6px}
     .messages::-webkit-scrollbar-thumb{background:var(--border);border-radius:10px}
@@ -808,6 +876,56 @@
       display: none;
     }
     .error-banner.show{display:block}
+    .btn-retry {
+      display: inline-block;
+      margin-left: 12px;
+      padding: 4px 14px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      transition: all .15s;
+      font-family: inherit;
+    }
+    .btn-retry:hover { background: var(--accent); color: #fff; }
+
+    /* ── 滚动到底部按钮 ── */
+    .btn-scroll-bottom {
+      position: absolute;
+      bottom: 16px;
+      right: 32px;
+      width: 42px; height: 42px;
+      border-radius: 50%;
+      background: var(--bg-input);
+      border: 2px solid var(--border);
+      color: var(--text-secondary);
+      font-size: 20px;
+      cursor: pointer;
+      z-index: 50;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all .25s cubic-bezier(.4,0,.2,1);
+      box-shadow: var(--shadow-md);
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .btn-scroll-bottom.show {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+    .btn-scroll-bottom:hover {
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      color: var(--accent);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-lg);
+    }
 
     /* ============================================================
        Responsive
@@ -880,6 +998,7 @@
 
     <div class="sidebar-footer" id="sidebarFooter">
       <span class="status-dot"></span> 加载中...
+      <button class="btn-theme-toggle" id="btnThemeToggle" onclick="toggleTheme()" title="切换亮/暗主题">🌙</button>
     </div>
   </aside>
 
@@ -903,6 +1022,7 @@
         <h2>嗨～我是 Egg！</h2>
         <p>一颗会思考的蛋。还没孵出来，但已经很聪明了！问什么都会尽力帮你～</p>
       </div>
+      <button class="btn-scroll-bottom" id="btnScrollBottom" onclick="scrollToBottom()" title="回到底部">↓</button>
     </div>
 
     <!-- Input -->
@@ -955,6 +1075,31 @@
     }
     const USER_ID = getOrCreateUserId();
     const LOCAL_CONV_KEY = 'egg_conversations_' + USER_ID;
+
+    // ── 主题切换 ──
+    const THEME_KEY = 'egg_theme';
+    function getTheme() {
+      const stored = localStorage.getItem(THEME_KEY);
+      if (stored === 'dark' || stored === 'light') return stored;
+      return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    function applyTheme(theme) {
+      document.documentElement.setAttribute('data-theme', theme);
+      const btn = document.getElementById('btnThemeToggle');
+      if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+    }
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme') || 'light';
+      const next = current === 'dark' ? 'light' : 'dark';
+      localStorage.setItem(THEME_KEY, next);
+      applyTheme(next);
+    }
+    // 初始化主题
+    applyTheme(getTheme());
+    // 监听系统主题变化
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+      if (!localStorage.getItem(THEME_KEY)) applyTheme(e.matches ? 'dark' : 'light');
+    });
 
     // ── 本地缓存（作为服务器存储的备份）──
     function saveToLocalCache(name, messages) {
@@ -1056,8 +1201,7 @@
         newChat(false);
         refreshConvList();
       } catch (err) {
-        errorBanner.textContent = '😢 无法连接到服务器，请运行 npm run web 启动服务';
-        errorBanner.classList.add('show');
+        showError('😢 无法连接到服务器，请运行 npm start 启动服务', () => window.location.reload());
       }
     })();
 
@@ -1124,7 +1268,7 @@
             return `
               <div class="conv-item${c.name === state.convName ? ' active' : ''}" onclick="loadConv('${c.name}')">
                 <span class="conv-item-icon">${icon}</span>
-                <span class="conv-item-title">${escapeHtml(display)}</span>
+                <span class="conv-item-title" ondblclick="startRename(event, '${c.name}')" title="双击重命名">${escapeHtml(display)}</span>
                 <span class="conv-item-date">${date}</span>
                 <button class="conv-item-del" onclick="event.stopPropagation();deleteConv('${c.name}')" title="删除">×</button>
               </div>`;
@@ -1151,6 +1295,7 @@
       if (emptyState) emptyState.style.display = 'none';
       scrollBottom();
       refreshConvList();
+      inputEl.focus();
       toastMsg('📂 已加载');
     }
 
@@ -1160,6 +1305,60 @@
       if (state.convName === name) newChat(false);
       refreshConvList();
       toastMsg('🗑️ 已删除');
+    }
+
+    // ── 对话重命名 ──
+    function startRename(e, name) {
+      e.stopPropagation();
+      e.preventDefault();
+
+      const titleEl = e.target;
+      if (titleEl.querySelector('input')) return; // 已经在编辑中
+
+      const currentName = titleEl.textContent;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.className = 'conv-item-title-edit';
+      input.value = currentName;
+
+      titleEl.textContent = '';
+      titleEl.appendChild(input);
+      input.focus();
+      input.select();
+
+      input.addEventListener('blur', () => finishRename(name, input.value.trim(), titleEl));
+      input.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+        if (ev.key === 'Escape') { input.value = currentName; input.blur(); }
+      });
+    }
+
+    async function finishRename(oldName, newName, titleEl) {
+      titleEl.textContent = newName || oldName; // 先恢复 DOM
+      if (!newName || newName === oldName) return;
+
+      try {
+        const res = await fetch(
+          '/api/conversations/' + encodeURIComponent(oldName) + '/rename?userId=' + encodeURIComponent(USER_ID),
+          { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ newName }) }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (state.convName === oldName) state.convName = data.name;
+          // 更新本地缓存
+          const conv = loadLocalConv(oldName);
+          if (conv) { saveToLocalCache(data.name, conv.messages); deleteLocalConv(oldName); }
+          refreshConvList();
+          toastMsg('✏️ 已重命名');
+        } else {
+          const err = await res.json().catch(() => ({}));
+          toastMsg('重命名失败: ' + (err.error || '未知错误'));
+          refreshConvList(); // 恢复原状
+        }
+      } catch {
+        toastMsg('重命名失败，请检查网络');
+        refreshConvList();
+      }
     }
 
     async function saveConvSilent() {
@@ -1395,6 +1594,7 @@
       state.isStreaming = true;
       btnSend.disabled = true;
       state.abortController = new AbortController();
+      hideError(); // 清除之前的错误信息
 
       let aiMsgIndex = -1;
       let fullContent = '';
@@ -1547,7 +1747,11 @@
             state.messages[aiMsgIndex].content += ' *(已中断 ⏸️)*';
           }
         } else {
-          state.messages.push({ role: 'assistant', content: `😢 出错了: ${err.message}` });
+          showError(`😢 连接出错: ${err.message}`, () => sendMessage());
+          // 移除空的 assistant 占位消息
+          if (aiMsgIndex >= 0 && !state.messages[aiMsgIndex].content) {
+            state.messages.splice(aiMsgIndex, 1);
+          }
         }
       }
 
@@ -1741,14 +1945,24 @@
 
     // ── 工具 ──
     function scrollBottom() {
-      requestAnimationFrame(() => {
-        const threshold = 50;
-        const isNearBottom = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < threshold;
-        if (isNearBottom) {
-          messagesEl.scrollTop = messagesEl.scrollHeight;
-        }
-      });
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      updateScrollButton();
     }
+
+    function scrollToBottom() {
+      messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: 'smooth' });
+    }
+
+    function updateScrollButton() {
+      const btn = document.getElementById('btnScrollBottom');
+      if (!btn) return;
+      const distance = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight;
+      if (distance > 300) btn.classList.add('show');
+      else btn.classList.remove('show');
+    }
+
+    // 监听滚动，控制按钮显示
+    messagesEl.addEventListener('scroll', updateScrollButton);
 
 
 
@@ -1772,6 +1986,24 @@
       toast.textContent = msg;
       toast.classList.add('show');
       setTimeout(() => toast.classList.remove('show'), 2200);
+    }
+
+    // ── 错误横幅 ──
+    function showError(msg, retryFn) {
+      errorBanner.innerHTML = msg;
+      if (retryFn) {
+        const btn = document.createElement('button');
+        btn.className = 'btn-retry';
+        btn.textContent = '🔄 重试';
+        btn.onclick = retryFn;
+        errorBanner.appendChild(btn);
+      }
+      errorBanner.classList.add('show');
+    }
+
+    function hideError() {
+      errorBanner.classList.remove('show');
+      errorBanner.innerHTML = '';
     }
 
     // ── Ctrl+S 保存 ──

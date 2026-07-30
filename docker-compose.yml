@@ -1,0 +1,27 @@
+# ============================================================
+#  Egg Chat — Docker Compose 编排
+#  一键启动：docker compose up -d
+# ============================================================
+
+services:
+  egg:
+    build: .
+    container_name: egg-chat
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      # 以下变量可通过 .env 文件或环境变量传入
+      # - PROVIDER=deepseek
+      # - API_KEY=sk-your-key
+      # - MODEL=deepseek-v4-flash
+    env_file:
+      - .env  # 如果 .env 文件存在则自动加载
+    volumes:
+      # 持久化数据目录（对话记录、知识库）
+      - egg-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  egg-data:
