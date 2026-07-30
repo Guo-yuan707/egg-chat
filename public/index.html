@@ -944,6 +944,17 @@
        JavaScript — 保持轻量，零框架依赖
        ============================================================ -->
   <script>
+    // ── 用户隔离：生成唯一 userId ──
+    function getOrCreateUserId() {
+      let userId = localStorage.getItem('egg_user_id');
+      if (!userId) {
+        userId = 'user_' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+        localStorage.setItem('egg_user_id', userId);
+      }
+      return userId;
+    }
+    const USER_ID = getOrCreateUserId();
+
     // ── State ──
     const state = {
       messages: [],
@@ -952,6 +963,7 @@
       abortController: null,
       config: null,
       attachedFile: null,
+      userId: USER_ID,
     };
 
     // ── Marked + Highlight setup ──
@@ -1045,7 +1057,7 @@
 
     async function refreshConvList() {
       try {
-        const res = await fetch('/api/conversations');
+        const res = await fetch('/api/conversations?userId=' + encodeURIComponent(USER_ID));
         const list = await res.json();
         convList.innerHTML = list.length > 0
           ? list.map(c => {
@@ -1071,7 +1083,7 @@
     async function loadConv(name) {
       if (state.isStreaming) return;
       try {
-        const res = await fetch('/api/conversations/' + encodeURIComponent(name));
+        const res = await fetch('/api/conversations/' + encodeURIComponent(name) + '?userId=' + encodeURIComponent(USER_ID));
         if (!res.ok) { toastMsg('对话不存在 😢'); return; }
         const data = await res.json();
         state.messages = data.messages;
@@ -1086,7 +1098,7 @@
     }
 
     async function deleteConv(name) {
-      await fetch('/api/conversations/' + encodeURIComponent(name), { method: 'DELETE' });
+      await fetch('/api/conversations/' + encodeURIComponent(name) + '?userId=' + encodeURIComponent(USER_ID), { method: 'DELETE' });
       if (state.convName === name) newChat(false);
       refreshConvList();
       toastMsg('🗑️ 已删除');
@@ -1097,7 +1109,7 @@
         await fetch('/api/conversations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: state.convName, messages: state.messages }),
+          body: JSON.stringify({ name: state.convName, messages: state.messages, userId: USER_ID }),
         });
       } catch {}
     }
@@ -1110,7 +1122,8 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name: state.convName || null,
-            messages: state.messages
+            messages: state.messages,
+            userId: USER_ID
           }),
         });
         const data = await res.json();

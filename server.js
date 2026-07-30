@@ -733,20 +733,26 @@ async function handleSetModel(config, req, res) {
 
 // GET /api/conversations — 列出已保存的对话
 function handleListConversations(req, res) {
-  const list = listConversations();
+  const urlObj = new URL(req.url, `http://localhost`);
+  const userId = urlObj.searchParams.get('userId') || 'default';
+  const list = listConversations(userId);
   json(res, 200, list);
 }
 
 // GET /api/conversations/:name — 加载对话
 function handleLoadConversation(req, res, name) {
-  const data = loadConv(name);
+  const urlObj = new URL(req.url, `http://localhost`);
+  const userId = urlObj.searchParams.get('userId') || 'default';
+  const data = loadConv(name, userId);
   if (!data) return json(res, 404, { error: '对话不存在' });
   json(res, 200, data);
 }
 
 // DELETE /api/conversations/:name — 删除对话
 function handleDeleteConversation(req, res, name) {
-  const ok = deleteConv(name);
+  const urlObj = new URL(req.url, `http://localhost`);
+  const userId = urlObj.searchParams.get('userId') || 'default';
+  const ok = deleteConv(name, userId);
   json(res, 200, { success: ok });
 }
 
@@ -755,6 +761,7 @@ async function handleSaveConversation(config, req, res) {
   const body = await parseBody(req);
   if (!body?.messages) return json(res, 400, { error: '缺少 messages 字段' });
 
+  const userId = body.userId || 'default';
   let name = body.name || null;
   // 没有标题时，调用 AI 自动生成
   if (!name) {
@@ -763,7 +770,7 @@ async function handleSaveConversation(config, req, res) {
     } catch {}
   }
 
-  const filename = saveConversation(name, body.messages);
+  const filename = saveConversation(name, body.messages, userId);
   json(res, 200, { success: true, filename });
 }
 
