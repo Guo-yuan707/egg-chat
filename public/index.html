@@ -1106,11 +1106,18 @@
 
     async function saveConvSilent() {
       try {
-        await fetch('/api/conversations', {
+        const res = await fetch('/api/conversations', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: state.convName, messages: state.messages, userId: USER_ID }),
         });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.filename) {
+            state.convName = data.filename.replace('.json', '');
+            refreshConvList();
+          }
+        }
       } catch {}
     }
 
@@ -1487,7 +1494,8 @@
       document.getElementById('uploadProgressArea').style.display = 'none';
       renderAttachedFile();
       inputEl.focus();
-      if (state.convName) saveConvSilent();
+      // 保存对话（新对话也会保存，没有标题则自动生成）
+      if (state.messages.length > 1) saveConvSilent();
     }
 
     // ── 渲染 ──
